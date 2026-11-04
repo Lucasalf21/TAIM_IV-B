@@ -1,0 +1,19 @@
+:root { --bg:#000; --panel:#0a1214; --text:#b8c4c8; --teal:#3fd0c4; --orange:#f9a766; }
+body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,sans-serif; text-align:center; padding:20px; }
+h1 { font-size:20px; margin:0 0 4px; }
+.sub { font-size:12px; opacity:.6; margin-bottom:10px; }
+#info { color:var(--orange); font-size:13px; margin-bottom:10px; }
+#chart { background:var(--panel); border-radius:12px; max-width:100%; }
+.btns { margin-top:16px; }
+button { border:0; border-radius:8px; padding:12px 40px; margin:0 8px; font-weight:700; font-size:15px; cursor:pointer; color:#000; }
+button:disabled { opacity:.4; cursor:default; }
+#go { background:var(--teal); }
+#nogo { background:var(--orange); }
+#result { display:none; margin:20px auto 0; max-width:520px; background:var(--panel); border:1px solid #1d3a3d; border-radius:12px; padding:16px; }
+#result .verdict { font-size:22px; font-weight:700; margin-bottom:8px; }
+.ok { color:var(--teal); }
+.bad { color:var(--orange); }
+#result table { margin:0 auto; text-align:left; font-size:14px; border-spacing:12px 4px; }
+#error { color:#ff7b7b; font-size:13px; margin-top:12px; }
+.axis text { fill:var(--text); }
+.axis path, .axis line { stroke:#456; }

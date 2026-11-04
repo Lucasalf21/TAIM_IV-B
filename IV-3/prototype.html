@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IV-3 Box-plot series - prototype</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Helicopter Wind-Speed Forecast - Go / No-Go</h1>
+<div class="sub">10-member ERA5 ensemble · 100 m altitude · threshold 5 m/s · prototype (box-plot series)</div>
+<div id="info"></div>
+
+<svg id="chart" width="900" height="420" viewBox="0 0 900 420"></svg>
+
+<div class="btns">
+  <button id="go">GO</button>
+  <button id="nogo">NO-GO</button>
+</div>
+
+<div id="result"></div>
+<div id="error"></div>
+
+<script>
+// Show Episode 10 (E10)
+var chosenEpisode = "E10";
+var windLimit = 5;
+
+// chart size
+var chartWidth = 900;
+var chartHeight = 420;
+var marginTop = 30;
+var marginRight = 30;
+var marginBottom = 50;
+var marginLeft = 55;
+
+// Data for the chosen episode (filled after loading)
+var episodeInfo;
+var boxData = [];
+
+
+// load the two csv files
+Promise.all([
+  d3.csv("../data/episodes_members.csv", d3.autoType),
+  d3.csv("../data/episodes.csv", d3.autoType)
+]).then(function (files) {
+  var memberRows = files[0];
+  var episodeRows = files[1];
+
+  episodeInfo = episodeRows.find(function (row) { return row.episode == chosenEpisode; });
+  var thisEpisodeRows = memberRows.filter(function (row) { return row.episode == chosenEpisode; });
+
+  makeBoxData(thisEpisodeRows);
+  document.getElementById("info").textContent = "Episode " + chosenEpisode;
+  drawBoxes();
+
+}).catch(function () {
+  document.getElementById("error").textContent =
+    "Could not load the data. Open this with a local server (python -m http.server) and check the ../data/ folder.";
+});
+
+
+// one box for each time step: min, p25, median, p75, max
+function makeBoxData(rows) {
+  var steps = d3.group(rows, function (row) { return row.step; });
+
+  steps.forEach(function (stepRows, stepNumber) {
+    var speeds = stepRows.map(function (row) { return row.wind_speed_100m; });
+    speeds.sort(d3.ascending);
+
+    boxData.push({
+      step: stepNumber,
+      inWindow: stepRows[0].in_window == 1,
+      lowest: speeds[0],
+      q25: d3.quantile(speeds, 0.25),
+      middle: d3.quantile(speeds, 0.5),
+      q75: d3.quantile(speeds, 0.75),
+      highest: speeds[speeds.length - 1]
+    });
+  });
+
+  boxData.sort(function (a, b) { return a.step - b.step; });
+}
+
+
+function drawBoxes() {
+  var svg = d3.select("#chart");
+
+  var scaleX = d3.scaleBand()
+    .domain(boxData.map(function (b) { return b.step; }))
+    .range([marginLeft, chartWidth - marginRight])
+    .padding(0.5);
+
+  var scaleY = d3.scaleLinear()
+    .domain([0, 10])
+    .range([chartHeight - marginBottom, marginTop]);
+
+  var boxWidth = scaleX.bandwidth();
+
+  // decision window (the step marked in_window)
+  var windowBox = boxData.find(function (b) { return b.inWindow; });
+  if (windowBox) {
+    svg.append("rect")
+      .attr("x", scaleX(windowBox.step) - 6)
+      .attr("y", marginTop)
+      .attr("width", boxWidth + 12)
+      .attr("height", chartHeight - marginBottom - marginTop)
+      .attr("fill", "rgba(43,108,255,0.15)")
+      .attr("stroke", "#2b6cff")
+      .attr("stroke-dasharray", "4 3");
+  }
+
+  // axes
+  svg.append("g")
+    .attr("class", "axis")
+    .attr("transform", "translate(0," + (chartHeight - marginBottom) + ")")
+    .call(d3.axisBottom(scaleX).tickFormat(function (s) { return "+" + (s * 3) + "h"; }));
+
+  svg.append("g")
+    .attr("class", "axis")
+    .attr("transform", "translate(" + marginLeft + ",0)")
+    .call(d3.axisLeft(scaleY));
+
+  // threshold line
+  svg.append("line")
+    .attr("x1", marginLeft)
+    .attr("x2", chartWidth - marginRight)
+    .attr("y1", scaleY(windLimit))
+    .attr("y2", scaleY(windLimit))
+    .attr("stroke", "#f9a766")
+    .attr("stroke-dasharray", "6 4");
+
+  svg.append("text")
+    .attr("x", chartWidth - marginRight)
+    .attr("y", scaleY(windLimit) - 5)
+    .attr("text-anchor", "end")
+    .attr("fill", "#f9a766")
+    .attr("font-size", 11)
+    .text("Threshold 5 m/s");
+
+  // draw each box
+  boxData.forEach(function (b) {
+    var centerX = scaleX(b.step) + boxWidth / 2;
+
+    // whisker (min to max)
+    svg.append("line")
+      .attr("x1", centerX).attr("x2", centerX)
+      .attr("y1", scaleY(b.lowest)).attr("y2", scaleY(b.highest))
+      .attr("stroke", "#3fd0c4");
+
+    // whisker caps
+    svg.append("line")
+      .attr("x1", centerX - 5).attr("x2", centerX + 5)
+      .attr("y1", scaleY(b.lowest)).attr("y2", scaleY(b.lowest))
+      .attr("stroke", "#3fd0c4");
+    svg.append("line")
+      .attr("x1", centerX - 5).attr("x2", centerX + 5)
+      .attr("y1", scaleY(b.highest)).attr("y2", scaleY(b.highest))
+      .attr("stroke", "#3fd0c4");
+
+    // box (p25 to p75)
+    svg.append("rect")
+      .attr("x", scaleX(b.step))
+      .attr("y", scaleY(b.q75))
+      .attr("width", boxWidth)
+      .attr("height", Math.max(1, scaleY(b.q25) - scaleY(b.q75)))
+      .attr("fill", "rgba(63,208,196,0.35)")
+      .attr("stroke", "#3fd0c4");
+
+    // median
+    svg.append("line")
+      .attr("x1", scaleX(b.step)).attr("x2", scaleX(b.step) + boxWidth)
+      .attr("y1", scaleY(b.middle)).attr("y2", scaleY(b.middle))
+      .attr("stroke", "#ffffff")
+      .attr("stroke-width", 2);
+  });
+}
+
+
+// show the result after clicking a button
+function showResult(playerChoice) {
+  // the csv says GO or CANCEL, the button says NO-GO
+  var rightAnswer = "NO-GO";
+  if (episodeInfo.normative == "GO") {
+    rightAnswer = "GO";
+  }
+
+  var isCorrect = (playerChoice == rightAnswer);
+
+  var whatHappened = "Wind stayed below 5 m/s in the window";
+  if (episodeInfo.exceeded == 1) {
+    whatHappened = "Wind exceeded 5 m/s in the window";
+  }
+
+  var resultBox = document.getElementById("result");
+  resultBox.style.display = "block";
+  resultBox.innerHTML =
+    '<div class="verdict ' + (isCorrect ? "ok" : "bad") + '">' + (isCorrect ? "✓ Correct" : "✗ Wrong") + "</div>" +
+    "<table>" +
+    "<tr><td>Your decision</td><td><b>" + playerChoice + "</b></td></tr>" +
+    "<tr><td>Correct answer</td><td><b>" + rightAnswer + "</b></td></tr>" +
+    "<tr><td>Ensemble probability p</td><td>" + episodeInfo.p_ensemble + "</td></tr>" +
+    "<tr><td>What really happened</td><td>" + whatHappened + "</td></tr>" +
+    "</table>";
+
+  // block the buttons after answering
+  document.getElementById("go").disabled = true;
+  document.getElementById("nogo").disabled = true;
+}
+
+document.getElementById("go").onclick = function () { showResult("GO"); };
+document.getElementById("nogo").onclick = function () { showResult("NO-GO"); };
+</script>
+
+</body>
+</html>
