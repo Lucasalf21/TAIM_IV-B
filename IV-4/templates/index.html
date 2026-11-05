@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Maintenance Crew Decision Study</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">TAIM study</p>
+          <h1>Maintenance Crew Decision Study</h1>
+        </div>
+        <div id="progress-pill" class="progress-pill">0 / 20</div>
+      </header>
+
+      <main>
+        <section id="intro-panel" class="card intro-panel">
+          <p class="eyebrow">Before you begin</p>
+          <h2>Make 20 maintenance decisions</h2>
+          <p>
+            You will see 20 wind episodes in a random order. For each episode,
+            decide whether to send a maintenance crew based on the highlighted
+            3-hour decision window.
+          </p>
+          <ul class="intro-list">
+            <li>Send the crew if wind stays at or below 5 m/s for the full window.</li>
+            <li>Do not send the crew if wind exceeds 5 m/s at any point in the window.</li>
+            <li>Take as much time as you need. Your decision time is recorded for each episode.</li>
+            <li>Your results and total cost will be shown after all 20 decisions.</li>
+          </ul>
+          <button id="start-button" class="primary-button intro-start-button" type="button">
+            Start study
+          </button>
+        </section>
+
+        <section id="study-panel" class="card hidden">
+          <div class="meta-row">
+            <span id="episode-label">Episode</span>
+            <span id="participant-label">Participant</span>
+          </div>
+
+          <div class="chart-card">
+            <div class="window-badge" aria-label="Highlighted three-hour decision window">
+              <span class="window-badge-marker"></span>
+              <span>Decision window: 3 hours</span>
+            </div>
+            <svg id="wind-chart" viewBox="0 0 920 360" role="img" aria-label="Wind speed dot series chart"></svg>
+          </div>
+
+          <div class="instruction-box">
+            Decide whether to send a maintenance crew based only on the highlighted 3-hour decision window.
+            The decision threshold is 5 m/s.
+          </div>
+
+          <div class="decision-actions">
+            <button id="send-button" class="primary-button" type="button" data-choice="send">
+              Send maintenance crew
+            </button>
+            <button id="hold-button" class="secondary-button" type="button" data-choice="not_send">
+              Do not send crew
+            </button>
+          </div>
+        </section>
+
+        <section id="summary-panel" class="card hidden">
+          <h2>Study complete</h2>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="label">Total cost</span>
+              <strong id="total-cost">€0</strong>
+            </div>
+            <div class="summary-item">
+              <span class="label">Perfect cost</span>
+              <strong id="perfect-cost">€0</strong>
+            </div>
+            <div class="summary-item">
+              <span class="label">Correct choices</span>
+              <strong id="correct-count">0 / 20</strong>
+            </div>
+          </div>
+
+          <div class="summary-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Episode</th>
+                  <th>Decision</th>
+                  <th>Correct</th>
+                  <th>Time</th>
+                  <th>Cost</th>
+                </tr>
+              </thead>
+              <tbody id="summary-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "description": "Static dark-mode dot series for a 10-member offshore wind forecast ensemble.",
+  "width": 900,
+  "height": 480,
+  "background": "#111827",
+  "params": [
+    {
+      "name": "selectedEpisode",
+      "value": "E01"
+    }
+  ],
+  "data": {
+    "url": "episodes_members.csv",
+    "format": {
+      "type": "csv"
+    }
+  },
+  "transform": [
+    {
+      "filter": "datum.episode === selectedEpisode"
+    },
+    {
+      "calculate": "isValid(datum.member_id) ? toNumber(datum.member_id) : toNumber(datum.member)",
+      "as": "member_id"
+    },
+    {
+      "calculate": "isValid(datum.wind_speed) ? toNumber(datum.wind_speed) : toNumber(datum.wind_speed_100m)",
+      "as": "wind_speed"
+    },
+    {
+      "calculate": "toDate(toNumber(toDate(datum.time)) + (toNumber(datum.member_id) - 5.5) * 60000)",
+      "as": "time_jittered"
+    }
+  ],
+  "layer": [
+    {
+      "mark": {
+        "type": "point",
+        "filled": true,
+        "size": 72,
+        "opacity": 0.95,
+        "stroke": "#f9fafb",
+        "strokeWidth": 0.7,
+        "cursor": "default",
+        "tooltip": null
+      },
+      "encoding": {
+        "x": {
+          "field": "time_jittered",
+          "type": "temporal",
+          "title": "Time (hours)",
+          "scale": {
+            "type": "utc"
+          },
+          "axis": {
+            "labelExpr": "utcFormat(datum.value, '%H:%M')",
+            "labelColor": "#d1d5db",
+            "titleColor": "#f9fafb",
+            "gridColor": "#374151",
+            "domainColor": "#9ca3af",
+            "tickColor": "#9ca3af"
+          }
+        },
+        "y": {
+          "field": "wind_speed",
+          "type": "quantitative",
+          "title": "Wind speed at 100 m (m/s)",
+          "scale": {
+            "zero": true
+          },
+          "axis": {
+            "labelColor": "#d1d5db",
+            "titleColor": "#f9fafb",
+            "gridColor": "#374151",
+            "domainColor": "#9ca3af",
+            "tickColor": "#9ca3af"
+          }
+        },
+        "color": {
+          "field": "member_id",
+          "type": "nominal",
+          "title": "Ensemble member",
+          "scale": {
+            "domain": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ],
+            "range": [
+              "#E69F00",
+              "#56B4E9",
+              "#009E73",
+              "#F0E442",
+              "#0072B2",
+              "#D55E00",
+              "#CC79A7",
+              "#000000",
+              "#7F7F7F",
+              "#8C564B"
+            ]
+          },
+          "legend": {
+            "labelColor": "#d1d5db",
+            "titleColor": "#f9fafb",
+            "symbolStrokeColor": "#f9fafb"
+          }
+        },
+        "detail": {
+          "field": "member_id",
+          "type": "nominal"
+        }
+      }
+    },
+    {
+      "data": {
+        "values": [
+          {
+            "threshold": 5
+          }
+        ]
+      },
+      "mark": {
+        "type": "rule",
+        "color": "#FF4B4B",
+        "strokeWidth": 3,
+        "cursor": "default",
+        "tooltip": null
+      },
+      "encoding": {
+        "y": {
+          "field": "threshold",
+          "type": "quantitative"
+        }
+      }
+    }
+  ],
+  "config": {
+    "view": {
+      "stroke": null
+    },
+    "axis": {
+      "labelFont": "sans-serif",
+      "titleFont": "sans-serif",
+      "labelFontSize": 12,
+      "titleFontSize": 14
+    },
+    "legend": {
+      "labelFont": "sans-serif",
+      "titleFont": "sans-serif"
+    }
+  }
+}

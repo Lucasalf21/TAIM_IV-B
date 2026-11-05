@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Participant {{ participant.participant_code }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+    <style>
+      body { padding: 32px 20px; }
+      .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; }
+      .toolbar a { color: #e2e8f0; text-decoration: none; border: 1px solid rgba(148,163,184,0.2); border-radius: 10px; padding: 10px 16px; }
+      .participant-meta { color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+      .participant-meta strong { color: var(--text); }
+      .correct-true { color: var(--success); font-weight: 700; }
+      .correct-false { color: var(--danger); font-weight: 700; }
+      .decision { text-transform: capitalize; }
+      table { width: 100%; }
+      th, td { padding: 12px 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="toolbar">
+        <h1>Participant {{ participant.participant_code }}</h1>
+        <a href="{{ url_for('admin_dashboard') }}">Back to dashboard</a>
+      </div>
+
+      <div class="card">
+        <div class="participant-meta">
+          Status: <strong>{{ participant.status }}</strong><br />
+          Created: <strong>{{ participant.created_at }}</strong><br />
+          Total elapsed: <strong>{{ "%.2f"|format(participant.total_elapsed_ms / 1000) }} s</strong><br />
+          Correct choices: <strong>{{ participant.correct_count }}</strong><br />
+          Total cost: <strong>€{{ participant.total_cost|admin_number }}</strong>
+        </div>
+
+        <div class="summary-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Episode</th>
+                <th>Decision</th>
+                <th>Time</th>
+                <th>Correct</th>
+                <th>Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for response in responses %}
+              <tr>
+                <td>{{ response.order_index + 1 }}</td>
+                <td>{{ response.episode_id }}</td>
+                <td class="decision">{{ response.choice|replace('_', ' ') }}</td>
+                <td>{{ "%.2f"|format(response.elapsed_ms / 1000) }} s</td>
+                <td class="{{ 'correct-true' if response.correct else 'correct-false' }}">
+                  {{ "Yes" if response.correct else "No" }}
+                </td>
+                <td>€{{ response.cost|admin_number }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6">No episode decisions recorded yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
