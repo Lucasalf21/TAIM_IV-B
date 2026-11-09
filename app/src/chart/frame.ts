@@ -6,6 +6,7 @@ export const THEME = {background: '#000000', text: '#a9acb0', highlight: '#bcf4e
   item: '#5fd3c4', alternate: '#f2a65a', band: '#3c7d79', deepBand: '#1c3537'};
 export interface ChartContext {episode: Episode; yMax: number; threshold: number; windowHours: number}
 export interface Renderer {
+  implemented?: boolean;
   readyForStudy: boolean;
   marks: (context: ChartContext) => Plot.Markish[];
 }

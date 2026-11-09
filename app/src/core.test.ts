@@ -25,7 +25,7 @@ test('consent is explicit, versioned and enforced beyond the screen', () => {
   assert.ok(accepted.consent?.accepted);
   assert.equal(recover(JSON.stringify(accepted), data).phase, 'instructions');
   assert.throws(() => recover(JSON.stringify({...accepted, consent: undefined}), data));
-  assert.throws(() => recover(JSON.stringify({...accepted, protocol: 'ivb-template-1'}), data));
+  for (const protocol of ['ivb-template-1', 'ivb-template-2']) assert.throws(() => recover(JSON.stringify({...accepted, protocol}), data));
 });
 test('declining and withdrawing discard responses and remain terminal after recovery', () => {
   const declined = withdraw(unconsented());

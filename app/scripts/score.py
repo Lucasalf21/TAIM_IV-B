@@ -44,6 +44,17 @@ def score(row, truth):
     }
 
 
+def make_debrief(rows, metadata):
+    sequence = metadata['sequence'].split('|')
+    by_episode = {r['episode']: r for r in rows}
+    if len(sequence) != 20 or len(set(sequence)) != 20 or len(rows) != 20 or set(sequence) != set(by_episode):
+        raise ValueError('Debrief requires all 20 measured trials matching the session sequence.')
+    return {'schema': 1, 'sessionId': metadata['session_id'], 'dataset': metadata['dataset_version'],
+            'protocol': metadata['protocol'], 'condition': metadata['condition'], 'mode': metadata['mode'],
+            'trials': [{'episode': id, 'decision': by_episode[id]['decision'],
+                        'observed': by_episode[id]['observed_exceedance']} for id in sequence]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trials', type=Path)
@@ -51,7 +62,8 @@ def main():
     parser.add_argument('--session', required=True, type=Path, help='Latest session CSV; re-export after any withdrawal')
     parser.add_argument('--allow-simulated', action='store_true', help='For software verification only; never participant evidence')
     args = parser.parse_args()
-    if args.output.exists():
+    debrief_path = args.output.with_suffix('.debrief.json')
+    if args.output.exists() or debrief_path.exists():
         parser.error('Output already exists; choose a new filename to preserve previous results.')
     manifest = json.loads((APP / 'scripts/source-manifest.json').read_text())
     for name, digest in manifest['sources'].items():
@@ -84,7 +96,7 @@ def main():
                 parser.error(f'Trials do not match the latest session record: {field}.')
         if row['mode'] not in ('study', 'pilot', 'simulated') or row['condition'] not in ('IV-3', 'IV-4'):
             parser.error('Unknown mode or condition.')
-        if row['protocol'] != 'ivb-template-2' or row['dataset_version'] != manifest['version']:
+        if row['protocol'] != 'ivb-template-3' or row['dataset_version'] != manifest['version']:
             parser.error('Export protocol or dataset version does not match this scorer.')
         if row['mode'] == 'simulated' and not args.allow_simulated:
             parser.error('Simulation export rejected. --allow-simulated is for software checks only.')
@@ -104,11 +116,18 @@ def main():
         result.append({**row, **calculated})
     extra = ['outcome_correct', 'normative_agreement', 'realised_cost_eur', 'confidence_brier',
              'probability_brier', 'ensemble_probability', 'observed_exceedance']
+    try:
+        debrief = make_debrief(result, metadata)
+    except (KeyError, ValueError) as e:
+        parser.error(str(e))
     with args.output.open('x', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=headers + extra)
         writer.writeheader()
         writer.writerows(result)
+    with debrief_path.open('x') as f:
+        json.dump(debrief, f, indent=2)
     print(f'Scored {len(result)} submitted measured trials. Review repeated exposures and flags before analysis.')
+    print(f'Load {debrief_path} from the completed session’s researcher screen to show outcome feedback.')
 
 
 if __name__ == '__main__':

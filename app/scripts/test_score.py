@@ -4,10 +4,22 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from score import score, validate_session
+from score import score, validate_session, make_debrief
 
 
 class ScoringTest(unittest.TestCase):
+    def test_debrief_uses_exact_session_order_and_requires_all_trials(self):
+        sequence = [f'E{i:02}' for i in range(1, 21)]
+        metadata = {'session_id': 'test', 'dataset_version': 'dataset', 'protocol': 'ivb-template-3',
+                    'condition': 'IV-3', 'mode': 'simulated', 'sequence': '|'.join(sequence)}
+        rows = [{'episode': id, 'decision': 'GO', 'observed_exceedance': 0} for id in reversed(sequence)]
+        d = make_debrief(rows, metadata)
+        self.assertEqual([r['episode'] for r in d['trials']], sequence)
+        self.assertEqual(d['sessionId'], 'test')
+        self.assertEqual(d['trials'][0]['observed'], 0)
+        with self.assertRaises(ValueError):
+            make_debrief(rows[:-1], metadata)
+
     def test_cli_refuses_stale_trials_after_withdrawal(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

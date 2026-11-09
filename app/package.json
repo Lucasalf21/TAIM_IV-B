@@ -9,7 +9,7 @@
     "dev": "npm run prepare:data && vite --host 127.0.0.1",
     "build": "npm run prepare:data && tsc --noEmit && vite build && node scripts/check-bundle.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test src/core.test.ts scripts/data.test.mjs && python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "test": "node --test src/core.test.ts src/feedback.test.ts src/chart/iv3.test.ts scripts/data.test.mjs && python3 -m unittest discover -s scripts -p 'test_*.py'",
     "verify": "npm test && npm run build"
   },
   "dependencies": {"@observablehq/plot": "^0.6.17"},

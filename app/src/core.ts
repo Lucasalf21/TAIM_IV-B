@@ -5,7 +5,7 @@ import {CONSENT_VERSION} from './consent.ts';
 export type Phase = 'consent' | 'instructions' | 'trial' | 'feedback' | 'between' | 'questionnaire' | 'complete' | 'declined' | 'withdrawn';
 export interface Episode {id: string; hours: number[]; members: number[][]; windowStart: number}
 export interface Dataset {version: string; threshold: number; windowHours: number; episodes: Episode[]}
-export const PROTOCOL = 'ivb-template-2';
+export const PROTOCOL = 'ivb-template-3';
 export const STORAGE_KEY = 'taim-ivb-session-v1';
 export const PROBABILITY_EPISODES = ['E01', 'E07', 'E10', 'E13', 'E16'];
 export const TLX = ['mental', 'physical', 'temporal', 'performance', 'effort', 'frustration'] as const;

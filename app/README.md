@@ -1,8 +1,8 @@
 # IV-B shared experiment template
 
 English-only, supervised browser experiment shared by IV-3 (box-plot series) and IV-4
-(unconnected dot series). This branch supplies the experiment shell, not the two
-encodings. Both renderers have `readyForStudy: false`. Only **simulated** sessions
+(unconnected dot series). IV-3 renders real box-plot series; IV-4 remains a placeholder
+in this shared app. Both renderers have `readyForStudy: false`. Only **simulated** sessions
 can run. A simulated session is software verification, not a human pilot or study.
 
 ## Run locally
@@ -60,7 +60,7 @@ If saved JSON is damaged, export its raw backup; do not overwrite it without rev
 - Limit: wind **strictly greater than 5 m/s at 100 m**, within the 3-hour window.
 - Same 20 source episodes and datasets for both conditions.
 - Two synthetic practices, all members clearly safe then clearly unsafe. Practice
-  feedback describes these distributions; the simulated placeholder does not draw them.
+  feedback describes these distributions; IV-3 draws them with the same box-plot renderer.
 - No feedback during measured trials, no return to submitted responses.
 - Probability questions: E01 (0%), E07 (10%), E10 (20%), E13 (30%), E16 (100%).
   These fixed identifiers are used internally and in researcher exports, not shown to
@@ -100,12 +100,24 @@ samples. E13 has 16 timesteps; E19 has 9; the rest have 17. Do not pad or interp
 missing lead-up. All have one decision-window sample at relative hour zero: the window
 duration is 3 hours, even though its sampled start/end timestamp is identical.
 
-The template uses no Plot marks for simulation, so its measured-trial placeholder cannot
-be mistaken for an implemented encoding. Before enabling real sessions, implement and
-validate the renderer with both synthetic practices and all 20 episodes; add matching
-encoding instructions/legend, remove placeholder-only copy for real mode, and review
-the protocol with IV-4. Only then change its readiness flag. Run a two-person human
-pilot, make agreed corrections, and freeze the protocol/build before the main study.
+IV-3 draws one box for each actual timestep, using all ten member values. Quartiles
+use linear interpolation (R-7, matching NumPy's default percentile convention); whiskers
+reach the true minimum and maximum, with no outlier dots. Boxes use the class teal
+palette and a light median line. Marks are clipped to the shared frame; missing lead-up
+is not filled, and a boundary box at −48 h is clipped at that axis boundary. The
+instructions and chart legend explain the encoding. The transfer-time box is at 0 h;
+the 0–3 h shading indicates duration, not extra interpolated samples.
+
+Implemented encodings render in simulated mode too. `implemented` controls actual
+chart availability; `readyForStudy` remains false until the real-session readiness
+review. Select IV-3 + Simulated walkthrough to inspect both practices and all 20
+actual episodes. Simulation exports remain marked and rejected by the scorer by default.
+IV-4 still shows an empty frame here; its separate Flask project is not changed.
+
+Before collecting human data, review the implementation and agreed protocol with IV-4,
+arrange the two-person pilot, then enable the appropriate real-session readiness flag
+for that approved stage. Correct any pilot issues and freeze the study build before
+main-study recruitment. Rendering tests are not human-pilot evidence.
 
 ## Data boundary and provenance
 
@@ -128,6 +140,37 @@ mode is for implementation, not collecting study data.
 
 ## Exports and scoring
 
+### End-of-session feedback
+
+After all 20 trials **and** the workload questionnaire, the participant sees a results
+page with decision-quality totals and a per-trial table. This is calculated from the
+ensemble trajectories using the stated €5,000/€40,000 cost rule. It is not shown during
+measured trials or before the questionnaire. Practice trials are excluded.
+
+Recorded weather and realised costs remain researcher-only until the debrief. To show
+both kinds of feedback in a supervised session:
+
+1. Export the **session CSV** and **trials CSV** from the completed session.
+2. Run the scoring command below. Alongside `new-scored.csv`, it automatically creates
+   **`new-scored.debrief.json`**. For software simulations only, add `--allow-simulated`.
+3. On the completed session's **Researcher screen**, choose that file under
+   **Completed-session debrief file**. Then open **Participant screen**.
+4. The results now also show recorded-weather agreement, total realised scenario cost,
+   and each trial's recorded outcome and loss. Both feedback types are labelled
+   separately: a good decision under uncertainty can have an unlucky outcome.
+
+The JSON is validated against session ID, dataset, protocol, mode, condition, all 20
+episode IDs in presentation order, and the actual choices. Mismatched, incomplete,
+invalid or oversized files are rejected. It does not modify responses, timestamps or
+questionnaire answers. Imported outcomes are held only in memory: reload requires
+loading the file again; withdrawal, deletion or starting another session clears them.
+
+This manual step keeps recorded outcomes out of the shipped participant JavaScript.
+No outcome file is served or fetched automatically. File selection reads the local file;
+it does not upload it to a server. Treat debrief JSONs like other session-level exports
+for retention/deletion, including any copies generated for a subsequently withdrawn
+session. Do not give participants debrief files before they finish.
+
 Every CSV includes session ID, participant ID, condition, mode, protocol, dataset version
 and order row. Session CSV adds exact sequence and lifecycle state. Trials CSV includes
 practices, interrupted attempts, submitted responses, timing and flags. Questionnaire
@@ -142,6 +185,8 @@ python3 scripts/score.py /path/to/trials.csv /path/to/new-scored.csv --session /
 ```
 
 Scoring rejects simulation by default and refuses to overwrite an existing output.
+Both the scored CSV and its `.debrief.json` must have fresh filenames. Complete scoring
+requires all 20 measured responses matching the session's stored episode sequence.
 The latest session CSV is mandatory: it must be complete, have current recorded consent,
 and not be withdrawn. Every trial's session metadata must match it. Partial exports
 remain available for recovery/audit but cannot enter the scorer. Never supply an older
@@ -233,13 +278,14 @@ For a withdrawal/deletion request, the researcher must:
    other copies. File-system deletion of downloads is a human procedure; browser code
    cannot erase them. Any necessary request log should contain no experimental answers.
 
-Protocol is now `ivb-template-2`. Version-1 saves are intentionally not silently migrated
-to invented consent: recovery rejects them while the raw-backup/delete controls remain
-available. Keep version-1 simulation artifacts separate from new exports.
+Consent was introduced in `ivb-template-2`; the current `ivb-template-3` introduces real
+IV-3 chart rendering in simulation. Version-1/2 saves are not silently migrated to a
+different stimulus: recovery rejects them while raw-backup/delete controls remain
+available. Keep earlier simulation artifacts separate from new exports.
 
 The class teal/orange palette is the shared default, not an optional participant mode.
 The limit also has a dashed line and text label; the window has a boundary and text label,
 so meaning does not depend on hue alone. Keep those cues and the same palette across
-conditions. Validate the actual marks for colour-vision deficiencies when the renderers
-are implemented; the empty frame is not evidence of full chart accessibility. Integer
+conditions. Review the IV-3 marks for colour-vision accessibility during the pilot;
+the IV-4 empty frame is not evidence of a completed accessible chart. Integer
 y ticks were checked at the desktop study size; do not use phones for the main study.

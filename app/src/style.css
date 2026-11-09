@@ -7,6 +7,11 @@ header {display: flex; justify-content: space-between; align-items: center; padd
 nav {display: flex; flex-wrap: wrap; gap: 12px;}
 dialog {max-width: min(640px, calc(100% - 32px)); color: #e5e8e8; background: #000; border: 1px solid #728282; padding: 28px;}
 dialog::backdrop {background: #000b;}
+.results-table {overflow-x: auto; margin-block: 28px;}
+table {border-collapse: collapse; width: 100%; font-size: 14px;}
+caption {text-align: left; padding-bottom: 12px; color: var(--muted);}
+th, td {padding: 12px; text-align: left; border-bottom: 1px solid var(--line);}
+thead th {color: var(--accent);}
 main {min-height: 70vh; padding-block: 32px 64px;}
 h1, h2, h3, p {margin-top: 0;}
 h1 {font-size: clamp(32px, 4.4vw, 52px); line-height: 1.15; font-weight: 500; letter-spacing: -1.5px; margin-bottom: 24px; outline: none;}
