@@ -15,7 +15,7 @@ export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
     style: {background: THEME.background, color: THEME.text, fontSize: '14px', fontFamily: 'inherit'},
     ariaLabel: 'Wind speed at 100 metres over time. Highlighted transfer window starts at zero hours; limit is 5 metres per second.',
     x: {domain: [-48, 3], label: 'Hours relative to transfer', ticks: [-48, -36, -24, -12, 0, 3]},
-    y: {domain: [0, context.yMax], label: 'Wind speed at 100 m (m/s)', grid: true},
+    y: {domain: [0, 16], ticks: Array.from({length: 17}, (_, i) => i), label: 'Wind speed at 100 m (m/s)', grid: true},
     marks: [
       Plot.rect([{x1: 0, x2: 3, y1: 0, y2: context.yMax}], {x1: 'x1', x2: 'x2', y1: 'y1', y2: 'y2', fill: THEME.deepBand}),
       Plot.ruleY([context.threshold], {stroke: THEME.alternate, strokeDasharray: '6,4'}),
@@ -30,8 +30,8 @@ export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
   return chart;
 }
 export function contextFor(data: Dataset, episode: Episode): ChartContext {
-  const max = Math.max(...data.episodes.flatMap(e => e.members.flat()));
-  return {episode, yMax: Math.ceil(Math.max(8, max)) + 1, threshold: data.threshold, windowHours: data.windowHours};
+  if (episode.members.some(member => member.some(v => !Number.isFinite(v) || v < 0 || v > 16))) throw Error('Wind values fall outside the agreed 0–16 m/s axis. Review the dataset before proceeding.');
+  return {episode, yMax: 16, threshold: data.threshold, windowHours: data.windowHours};
 }
 export function practiceEpisode(index: number): Episode {
   return {id: `practice-${index + 1}`, hours: Array.from({length: 17}, (_, i) => (i - 16) * 3), windowStart: 16,

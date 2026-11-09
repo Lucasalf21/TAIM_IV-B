@@ -1,11 +1,57 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {begin, createSession, csv, exportsFor, finish, finishPractice, latinSquare, PROBABILITY_EPISODES,
-  recover, save, submit, TLX} from './core.ts';
+import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, finishPractice, latinSquare, PROBABILITY_EPISODES,
+  recover, save, STORAGE_KEY, submit, TLX, withdraw} from './core.ts';
 import type {Dataset, Session} from './core.ts';
+import {contextFor, practiceEpisode} from './chart/frame.ts';
+import {readFileSync} from 'node:fs';
 const data: Dataset = {version: 'test', threshold: 5, windowHours: 3,
   episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0}))};
-const create = () => createSession('P01', 'IV-3', 'simulated', 1, data, false);
+const unconsented = () => createSession('P01', 'IV-3', 'simulated', 1, data, false);
+const create = () => acceptConsent(unconsented(), true);
+test('fixed 0–16 axis contains all real and practice values and rejects clipping', () => {
+  const real = JSON.parse(readFileSync(new URL('./generated/stimuli.json', import.meta.url), 'utf8')) as Dataset;
+  for (const episode of [...real.episodes, practiceEpisode(0), practiceEpisode(1)]) assert.equal(contextFor(real, episode).yMax, 16);
+  assert.throws(() => contextFor(real, {id: 'bad', hours: [0], windowStart: 0, members: [[16.01]]}));
+});
+test('consent is explicit, versioned and enforced beyond the screen', () => {
+  const s = unconsented();
+  assert.equal(s.phase, 'consent');
+  assert.equal(s.attempts.length, 0);
+  assert.throws(() => acceptConsent(s, false));
+  assert.throws(() => begin({...s, phase: 'instructions'}));
+  assert.throws(() => submit({...s, phase: 'trial'}, 'GO', '80', '', 1));
+  const accepted = acceptConsent(s, true);
+  assert.ok(accepted.consent?.accepted);
+  assert.equal(recover(JSON.stringify(accepted), data).phase, 'instructions');
+  assert.throws(() => recover(JSON.stringify({...accepted, consent: undefined}), data));
+  assert.throws(() => recover(JSON.stringify({...accepted, protocol: 'ivb-template-1'}), data));
+});
+test('declining and withdrawing discard responses and remain terminal after recovery', () => {
+  const declined = withdraw(unconsented());
+  assert.equal(declined.phase, 'declined');
+  assert.equal(recover(JSON.stringify(declined), data).phase, 'declined');
+  let s = begin(create()); s = submit(s, 'GO', '80', '', 10); s = finishPractice(s); s = begin(s);
+  const stopped = withdraw(s);
+  assert.equal(stopped.phase, 'withdrawn');
+  assert.equal(stopped.cursor, 0);
+  assert.deepEqual(stopped.attempts, []);
+  assert.ok(stopped.withdrawn);
+  assert.equal(recover(JSON.stringify(stopped), data).phase, 'withdrawn');
+  assert.throws(() => begin(stopped));
+  assert.throws(() => finish(stopped, {} as Parameters<typeof finish>[1]));
+  assert.throws(() => acceptConsent(stopped, true));
+  assert.equal(exportsFor(stopped).trials.split('\r\n').filter(Boolean).length, 1);
+  assert.match(exportsFor(stopped).session, /withdrawn/);
+});
+test('local deletion is scoped to the experiment key and reports failures', () => {
+  const store = new Map([[STORAGE_KEY, 'session'], ['unrelated', 'preserve']]);
+  deleteLocal({removeItem: key => {store.delete(key);}, getItem: key => store.get(key) ?? null});
+  assert.equal(store.get('unrelated'), 'preserve');
+  assert.equal(store.has(STORAGE_KEY), false);
+  assert.throws(() => deleteLocal({removeItem: () => {throw Error('denied');}, getItem: () => 'session'}), /deletion failed/);
+  assert.throws(() => deleteLocal({removeItem: () => {}, getItem: () => 'session'}), /deletion failed/);
+});
 test('balanced Latin square covers all positions and directed adjacent pairs', () => {
   const ids = data.episodes.map(e => e.id), rows = ids.map((_, i) => latinSquare(ids, i + 1));
   for (const row of rows) assert.equal(new Set(row).size, 20);

@@ -1,8 +1,39 @@
 import unittest
-from score import score
+import csv
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from score import score, validate_session
 
 
 class ScoringTest(unittest.TestCase):
+    def test_cli_refuses_stale_trials_after_withdrawal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            session = root / 'session.csv'
+            with session.open('w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=['phase', 'session_phase', 'withdrawn_at', 'consent_version', 'consent_at'])
+                writer.writeheader()
+                writer.writerow({'phase': 'withdrawn', 'session_phase': 'withdrawn', 'withdrawn_at': '2026-11-09T13:00:00Z',
+                                 'consent_version': 'ivb-consent-2026-11-09', 'consent_at': '2026-11-09T12:00:00Z'})
+            # Reject the latest exit record before even reading a stale trials file.
+            output = root / 'scored.csv'
+            result = subprocess.run([sys.executable, str(Path(__file__).with_name('score.py')),
+                                     str(root / 'stale-trials.csv'), str(output), '--session', str(session), '--allow-simulated'], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('withdrawn', result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_scoring_requires_complete_current_consent_and_no_withdrawal(self):
+        row = {'phase': 'complete', 'session_phase': 'complete', 'withdrawn_at': '',
+               'consent_version': 'ivb-consent-2026-11-09', 'consent_at': '2026-11-09T12:00:00Z'}
+        validate_session(row)
+        for change in [{'phase': 'withdrawn'}, {'session_phase': 'trial'}, {'withdrawn_at': '2026-11-09T13:00:00Z'},
+                       {'consent_version': ''}, {'consent_at': ''}, {'consent_at': 'broken'}]:
+            with self.assertRaises(ValueError):
+                validate_session({**row, **change})
+
     def test_good_decision_can_have_bad_outcome(self):
         row = {'decision': 'GO', 'confidence': '80', 'probability': '10'}
         result = score(row, {'p_ensemble': '.1', 'exceeded': '1'})

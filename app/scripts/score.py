@@ -5,8 +5,17 @@ import hashlib
 import json
 import math
 from pathlib import Path
+from datetime import datetime
 
 APP = Path(__file__).resolve().parents[1]
+
+
+def validate_session(row):
+    if row['phase'] != 'complete' or row['session_phase'] != 'complete' or row['withdrawn_at']:
+        raise ValueError('Session is incomplete, declined or withdrawn; do not score its exports.')
+    if row['consent_version'] != 'ivb-consent-2026-11-09' or not row['consent_at']:
+        raise ValueError('Session does not have current recorded consent.')
+    datetime.fromisoformat(row['consent_at'].replace('Z', '+00:00'))
 
 
 def score(row, truth):
@@ -39,6 +48,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('trials', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--session', required=True, type=Path, help='Latest session CSV; re-export after any withdrawal')
     parser.add_argument('--allow-simulated', action='store_true', help='For software verification only; never participant evidence')
     args = parser.parse_args()
     if args.output.exists():
@@ -49,19 +59,32 @@ def main():
             parser.error('Source data changed; regenerate and review the data manifest first.')
     with (APP.parent / 'data/episodes.csv').open(newline='') as f:
         truth = {r['episode']: r for r in csv.DictReader(f)}
+    try:
+        with args.session.open(newline='', encoding='utf-8-sig') as f:
+            session_rows = list(csv.DictReader(f))
+        if len(session_rows) != 1:
+            raise ValueError('Provide the latest single-session CSV.')
+        metadata = session_rows[0]
+        validate_session(metadata)
+    except (KeyError, ValueError) as e:
+        parser.error(f'Invalid session record: {e}')
     with args.trials.open(newline='', encoding='utf-8-sig') as f:
         reader = csv.DictReader(f)
         required = {'session_id', 'participant_id', 'condition', 'mode', 'protocol', 'dataset_version', 'episode',
-                    'practice', 'status', 'decision', 'confidence', 'attempt', 'repeated_exposure', 'flags', 'duration_ms'}
+                    'practice', 'status', 'decision', 'confidence', 'attempt', 'repeated_exposure', 'flags', 'duration_ms',
+                    'session_phase', 'consent_version', 'consent_at', 'withdrawn_at'}
         if not required <= set(reader.fieldnames or []):
             parser.error('Input is not a template trials export.')
         headers = reader.fieldnames
         rows = list(reader)
     result, seen = [], set()
     for row in rows:
+        for field in ['session_id', 'participant_id', 'condition', 'mode', 'protocol', 'dataset_version', 'order_row', 'session_phase', 'consent_version', 'consent_at', 'withdrawn_at']:
+            if row.get(field) != metadata.get(field):
+                parser.error(f'Trials do not match the latest session record: {field}.')
         if row['mode'] not in ('study', 'pilot', 'simulated') or row['condition'] not in ('IV-3', 'IV-4'):
             parser.error('Unknown mode or condition.')
-        if row['protocol'] != 'ivb-template-1' or row['dataset_version'] != manifest['version']:
+        if row['protocol'] != 'ivb-template-2' or row['dataset_version'] != manifest['version']:
             parser.error('Export protocol or dataset version does not match this scorer.')
         if row['mode'] == 'simulated' and not args.allow_simulated:
             parser.error('Simulation export rejected. --allow-simulated is for software checks only.')

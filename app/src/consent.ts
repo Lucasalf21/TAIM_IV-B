@@ -1,0 +1,16 @@
+// Review this draft with IV-3/IV-4 before a human pilot; bump the version when wording changes.
+export const CONSENT_VERSION = 'ivb-consent-2026-11-09';
+export const CONSENT_HTML = `
+  <p>This TAIM coursework study at FEUP compares two ways of showing uncertain wind conditions. It is run by the IV-3 and IV-4 student teams.</p>
+  <h2>What taking part involves</h2>
+  <p>You will read instructions, complete two practice examples and 20 wind-transfer decisions, and answer a short workload questionnaire. Allow approximately 15–20 minutes; this is an estimate. You may ask the supervising researcher questions before deciding.</p>
+  <p>We collect GO/CANCEL choices, confidence ratings, some probability estimates, response times, questionnaire answers and optional comments. The euro amounts are fictional scenario costs, not payments or charges to you. There are no real operational decisions. You may experience mild tiredness or frustration.</p>
+  <h2>Your choice</h2>
+  <p>Participation is voluntary. You can decline or select <strong>Leave experiment</strong> at any time, without giving a reason or completing any remaining questions. There is no penalty for declining or stopping. Leaving discards your responses from this browser and retains only a session record showing that you stopped, until that record is deleted too.</p>
+  <h2>How your data will be used</h2>
+  <p>Responses will be used to compare visualizations for TAIM coursework analysis, the project report and presentation. The two student teams and course teaching staff may access session-level files. Public presentations will use aggregated results; raw session files will not be published. Do not put names or other identifying information in comments.</p>
+  <p>The app uses a participant code rather than asking for your name. A code does not guarantee anonymity if you share identifying details or the researcher can link it to you. Consent version and time, session identifiers, condition, episode order, and interruption/visibility flags are also recorded. The app does not record audio, video or your screen.</p>
+  <h2>Storage, retention and deletion</h2>
+  <p>Progress is stored in this browser. The researcher can download CSV files and JSON backups to restricted research storage; the app does not automatically send responses to a server. The teams will delete session-level responses and backups within <strong>90 days of the session</strong>. Deleting downloaded copies is a researcher responsibility, not an automatic app action.</p>
+  <p>You can delete the local session after leaving or finishing. That does not delete files already downloaded or their backups. To request removal of those copies, tell the supervising researcher and provide your participant/session code, shown on the exit and completion screens. They will pass the request to both teams. Ask the researcher how to contact the team later before leaving the session. Once results have been combined into unlinked aggregate statistics, your individual contribution may no longer be separable.</p>
+  <p>You may ask questions now. Select the checkbox only if you have read this information, had an opportunity to ask questions, and freely agree to take part. No signature or name is required by this app.</p>`;

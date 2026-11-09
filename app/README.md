@@ -33,7 +33,8 @@ Run one tab and one session at a time; do not use private browsing for data coll
 1. Enter an anonymous ID (e.g. `P01`), condition and order row. Do not enter names.
 2. Select **Simulated walkthrough**. Real pilot/study modes intentionally fail until
    the selected renderer is ready. Setup does not expose a condition switch during trials.
-3. Hand over the laptop. Instructions precede two synthetic practices, then 20 trials.
+3. Hand over the laptop. Mandatory information/consent precedes instructions, two
+   synthetic practices, then 20 trials. No checkbox is preselected; declining is terminal.
 4. Each trial requires GO/CANCEL and confidence 50–100%, with no default. Five
    episodes also require probability 0–100%, with no default. Inputs accept decimals.
 5. Submission locks the response. The next trial starts only when requested.
@@ -89,7 +90,7 @@ Entry points:
   and renderer interface. Each renderer returns Plot marks from its `ChartContext`.
 
 Retain shared dimensions (900×440), fixed x domain (−48 to +3 hours), common y domain
-(0 to one above the ceiling of the dataset-wide maximum, minimum upper limit 9), 5 m/s
+(0–16 with integer ticks), 5 m/s
 line, and 3-hour window. Palette tokens are transcribed from the supplied class slide;
 confirm them with the partner group before a human pilot. Do not add zoom, tooltips,
 filters, per-member emphasis, or participant chart controls.
@@ -137,10 +138,15 @@ identifying information when sharing exports.
 Score exports outside the browser:
 
 ```bash
-python3 scripts/score.py /path/to/trials.csv /path/to/new-scored.csv
+python3 scripts/score.py /path/to/trials.csv /path/to/new-scored.csv --session /path/to/latest-session.csv
 ```
 
 Scoring rejects simulation by default and refuses to overwrite an existing output.
+The latest session CSV is mandatory: it must be complete, have current recorded consent,
+and not be withdrawn. Every trial's session metadata must match it. Partial exports
+remain available for recovery/audit but cannot enter the scorer. Never supply an older
+complete session record after withdrawal: no offline tool can detect a newer record it
+has not been given. Remove withdrawn exports and all derived scored copies yourself.
 `--allow-simulated` exists only to check software; resulting rows are not study evidence.
 Pilot and study modes remain labelled and must be analysed separately. Practice and
 unsubmitted attempts are excluded from scoring. Repeated exposures and flagged trials
@@ -178,3 +184,62 @@ Runs Node assert-based tests, Python scoring tests, strict TypeScript checking, 
 production build, and the participant-bundle guard. TypeScript explicitly resolves
 Plot's shipped declarations because Plot 0.6.18's exports omit the types entry.
 See `VERIFICATION.md` for the actual browser walkthrough and remaining readiness gates.
+
+## Consent, withdrawal and deletion (protocol 2)
+
+Editable participant wording lives in **`src/consent.ts`**. This is a draft for the
+two teams to review before recruitment. It describes the purpose, approximately
+15–20-minute duration, collected data, fictional costs, voluntary participation,
+possible fatigue, data access, retention and deletion. The chosen draft policy is:
+
+- IV-3, IV-4 and course teaching staff may access session-level coursework data.
+- Only aggregates are used in public presentations; raw exports are not published.
+- The teams delete session-level data and backups within **90 days of the session**.
+- Participants ask the supervising researcher for deletion using the participant/session
+  codes shown on completion/exit. Provide a real team contact route during recruitment;
+  add it to the wording when agreed. There is no invented email address in the draft.
+- Unlinked aggregate statistics may no longer support individual removal.
+
+Confirm that the professor accepts this procedure, the retention period, storage access
+and actual follow-up contact route. Change the consent version whenever wording changes,
+and update the scorer's accepted version and tests to match. Record that frozen wording
+with the study materials. This app is not an institutional ethics approval or legal review.
+
+The header keeps **Leave experiment** available throughout participant screens, including
+the questionnaire and completion page. Leaving is immediate; it does not require filling
+inputs, answering a reason, or clicking a confirmation. It discards attempts/questionnaire
+and marks the session `withdrawn` (or `declined` before consent). Only setup/consent/exit
+metadata remains. That exit record cannot resume into trials. All CSVs include session
+phase, consent version/time and withdrawal time; withdrawn trial/questionnaire CSVs are
+header-only. Timers stop immediately. If saving the exit record fails, the app tries to
+delete the local session; if both operations fail it clearly requests researcher cleanup.
+
+**Delete local session** is available after leaving/completing and on the researcher
+screen (also for damaged/legacy saves). Its confirmation shows the target session codes
+where available and explains the boundary. It removes only the experiment's storage key
+and in-memory session; it does not clear unrelated site/browser data or source weather
+files. Keep session codes before deleting if downloaded copies need removal.
+
+For a withdrawal/deletion request, the researcher must:
+
+1. Re-export the latest exit/session record if an audit record is needed, before local deletion.
+2. Locate copies by participant/session ID across **both teams**: session/trial/questionnaire
+   CSVs, JSON backups, scored CSVs and shared/backup storage. Remove the requested
+   response data and exclude it from any pending analysis. Do not retain an old complete
+   status as permission to score withdrawn responses.
+3. Remove or recompute derived results while the participant remains identifiable.
+   Explain the limit once only unlinked aggregates remain.
+4. Delete the local session as requested and follow the agreed retention policy for all
+   other copies. File-system deletion of downloads is a human procedure; browser code
+   cannot erase them. Any necessary request log should contain no experimental answers.
+
+Protocol is now `ivb-template-2`. Version-1 saves are intentionally not silently migrated
+to invented consent: recovery rejects them while the raw-backup/delete controls remain
+available. Keep version-1 simulation artifacts separate from new exports.
+
+The class teal/orange palette is the shared default, not an optional participant mode.
+The limit also has a dashed line and text label; the window has a boundary and text label,
+so meaning does not depend on hue alone. Keep those cues and the same palette across
+conditions. Validate the actual marks for colour-vision deficiencies when the renderers
+are implemented; the empty frame is not evidence of full chart accessibility. Integer
+y ticks were checked at the desktop study size; do not use phones for the main study.

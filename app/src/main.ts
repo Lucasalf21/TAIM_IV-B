@@ -1,7 +1,8 @@
 import './style.css';
 import source from './generated/stimuli.json';
-import {begin, createSession, current, exportsFor, finish, finishPractice, PROBABILITY_EPISODES,
-  recover, save, STORAGE_KEY, submit, TLX} from './core.ts';
+import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, finishPractice, PROBABILITY_EPISODES,
+  recover, save, STORAGE_KEY, submit, TLX, withdraw} from './core.ts';
+import {CONSENT_HTML, CONSENT_VERSION} from './consent.ts';
 import type {Condition, Dataset, Mode, Questionnaire, Session} from './core.ts';
 import {contextFor, practiceEpisode, renderFrame} from './chart/frame.ts';
 import {iv3} from './chart/iv3.ts';
@@ -48,10 +49,21 @@ function download(name: string, text: string, type = 'text/csv;charset=utf-8') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function shell(content: string, title: string) {
-  root.innerHTML = `<header><span class="brand">TAIM / Wind transfer experiment</span><button class="quiet" id="researcher">${researcher ? 'Participant screen' : 'Researcher screen'}</button></header>
+  root.innerHTML = `<header><span class="brand">TAIM / Wind transfer experiment</span><nav aria-label="Session controls">${!researcher && session && !['declined', 'withdrawn'].includes(session.phase) ? '<button class="quiet" id="leave">Leave experiment</button>' : ''}<button class="quiet" id="researcher">${researcher ? 'Participant screen' : 'Researcher screen'}</button></nav></header>
     ${session?.mode === 'simulated' ? '<aside class="simulation">Simulated session · placeholder chart · not participant evidence</aside>' : ''}
     <main><div id="error" role="alert" tabindex="-1"></div>${content}</main>
-    <footer>TAIM 2026–27 · IV-B <span>Generated using Copernicus Climate Change Service information 2026. Neither the European Commission nor ECMWF is responsible for any use that may be made of the Copernicus information or data it contains.</span></footer>`;
+    <footer>TAIM 2026–27 · IV-B <span>Generated using Copernicus Climate Change Service information 2026. Neither the European Commission nor ECMWF is responsible for any use that may be made of the Copernicus information or data it contains.</span></footer>
+    <dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Delete this browser’s session?</h2><p>This permanently removes its local responses, consent and session record. It cannot delete CSVs, JSON backups or scored files already downloaded. Ask the researcher to remove those copies using your session code.</p><p id="delete-reference"></p><div class="actions"><button id="keep-local">Keep local data</button><button id="confirm-delete">Delete local data</button></div></dialog>`;
+  root.querySelector<HTMLButtonElement>('#leave')?.addEventListener('click', leave);
+  $('#keep-local').onclick = () => $<HTMLDialogElement>('#delete-dialog').close();
+  $('#confirm-delete').onclick = () => {
+    try {
+      if (changedElsewhere || localStorage.getItem(STORAGE_KEY) !== saved) throw Error('Another tab changed the saved session. Reload before deleting so you can check the target.');
+      deleteLocal(localStorage);
+      clockStart = undefined; session = undefined; saved = null; researcher = true; storageFailed = false;
+      render(); notice('Local session deleted. Downloaded files and backups were not deleted; ask the researcher to remove those copies separately.');
+    } catch (e) { $<HTMLDialogElement>('#delete-dialog').close(); notice((e as Error).message); }
+  };
   document.title = `${title} · TAIM`;
   $('#researcher').onclick = () => {
     if (!researcher && session?.phase === 'trial') {
@@ -68,12 +80,34 @@ function shell(content: string, title: string) {
   };
   root.querySelector<HTMLElement>('h1')?.focus();
 }
+function requestDelete() {
+  $('#delete-reference').textContent = session ? `Participant code: ${session.participant}. Session code: ${session.id}. Keep these codes to request removal of downloaded copies.` : 'This will remove the saved experiment session on this browser. Export its backup first if you need to identify downloaded copies.';
+  $<HTMLDialogElement>('#delete-dialog').showModal();
+}
+function leave() {
+  if (!session) return;
+  clockStart = undefined;
+  session = withdraw(session); researcher = false;
+  let message = '';
+  try {
+    if (changedElsewhere) throw Error('Another tab changed browser storage. This session has stopped here; ask the researcher to remove any other copies.');
+    save(localStorage, session); saved = JSON.stringify(session); storageFailed = false;
+  } catch (e) {
+    message = (e as Error).message;
+    if (!changedElsewhere) {
+      try { deleteLocal(localStorage); saved = null; message = 'The exit record could not be saved; the local session was deleted instead. Downloaded copies still need researcher removal.'; }
+      catch { message = 'You have stopped. Browser storage could not be updated or deleted. Ask the researcher to clear the saved session and exported copies; do not resume it.'; }
+    }
+  }
+  render();
+  if (message) notice(message);
+}
 function setup() {
   shell(`<section class="intro"><p class="caption">Researcher setup</p><h1 tabindex="-1">One experiment.<br>Two ways to see uncertainty.</h1>
     <p class="lead">Prepare a supervised session for the offshore wind-transfer task.</p></section>
     <div class="setup-grid"><section class="panel"><h2>Start a session</h2>
     <form id="setup">
-      <label>Anonymous participant ID<input name="participant" required pattern="[A-Za-z0-9_-]{1,32}" maxlength="32" placeholder="For example, P01" autocomplete="off"></label>
+      <label>Anonymous participant ID<input name="participant" required pattern="(?:[A-Za-z0-9_]|-){1,32}" maxlength="32" placeholder="For example, P01" autocomplete="off"></label>
       <div class="fields"><label>Condition<select name="condition"><option>IV-3</option><option>IV-4</option></select></label>
       <label>Order row<input name="row" type="number" min="1" max="20" step="1" value="1" required></label></div>
       <label>Session mode<select name="mode"><option value="simulated">Simulated walkthrough</option><option value="pilot">Real pilot (blocked)</option><option value="study">Real study (blocked)</option></select></label>
@@ -82,7 +116,7 @@ function setup() {
       <button type="submit">Start simulated session</button>
     </form></section>
     <section class="panel"><h2>Saved work</h2><p id="saved-status">${session ? `${escape(session.participant)} · ${escape(session.condition)} · ${escape(session.phase)}` : saved ? 'A saved session is available on this browser.' : 'No saved session on this browser.'}</p>
-      <div class="actions"><button id="recover" ${saved ? '' : 'disabled'}>Recover saved session</button><button id="backup" ${saved || session ? '' : 'disabled'}>Export JSON backup</button></div>
+      <div class="actions"><button id="recover" ${saved ? '' : 'disabled'}>Recover saved session</button><button id="backup" ${saved || session ? '' : 'disabled'}>Export JSON backup</button><button id="delete-local" ${saved || session ? '' : 'disabled'}>Delete local session</button></div>
       ${session ? '<h3>Researcher exports</h3><p class="hint">Export all three files separately. Practice and interrupted attempts remain marked. Back up files after every session.</p><div class="actions"><button data-export="session">Session CSV</button><button data-export="trials">Trials CSV</button><button data-export="questionnaire">Questionnaire CSV</button></div>' : ''}
       <hr><h3>Study settings</h3><dl><dt>Trials</dt><dd>2 practices + 20 episodes</dd><dt>Transfer window</dt><dd>3 hours</dd><dt>Wind limit</dt><dd>5 m/s at 100 m</dd><dt>Costs</dt><dd>€5,000 cancel / €40,000 abort</dd></dl>
     </section></div>`, 'Researcher setup');
@@ -103,7 +137,14 @@ function setup() {
     }, true);
   };
   $('#backup').onclick = () => download(`taim-backup-${session?.id ?? 'saved'}.json`, session ? JSON.stringify(session, null, 2) : saved!, 'application/json');
+  $('#delete-local').onclick = requestDelete;
   wireExports();
+}
+function consent() {
+  shell(`<section class="reading"><p class="caption">Participant information and consent</p><h1 tabindex="-1">Your choice to take part.</h1>${CONSENT_HTML}
+    <p class="hint">Information version: ${CONSENT_VERSION}</p><form id="consent"><label class="check"><input type="checkbox" name="agree" required> I have read this information, had an opportunity to ask questions, and freely agree to participate.</label><div class="actions"><button type="submit">I agree — continue to instructions</button><button type="button" id="decline">I do not consent</button></div></form></section>`, 'Consent');
+  $('#consent').onsubmit = event => {event.preventDefault(); action(() => acceptConsent(session!, new FormData(event.target as HTMLFormElement).get('agree') === 'on'));};
+  $('#decline').onclick = leave;
 }
 function wireExports() {
   root.querySelectorAll<HTMLButtonElement>('[data-export]').forEach(button => button.onclick = () => {
@@ -174,6 +215,7 @@ function render() {
   if (researcher) {setup(); return;}
   if (!session) {researcher = true; setup(); return;}
   switch (session.phase) {
+    case 'consent': consent(); break;
     case 'instructions': instructions(); break;
     case 'trial': trial(); break;
     case 'feedback': {
@@ -189,7 +231,12 @@ function render() {
     }
     case 'questionnaire': questionnaire(); break;
     case 'complete':
-      shell('<section class="reading"><p class="caption">Session complete</p><h1 tabindex="-1">Thank you.</h1><p>Your responses have been saved on this browser. Please hand the laptop back to the researcher so they can export the session.</p></section>', 'Complete'); break;
+      shell(`<section class="reading"><p class="caption">Session complete</p><h1 tabindex="-1">Thank you.</h1><p>Your responses have been saved on this browser. Please hand the laptop back to the researcher so they can export the session.</p><p>Participant code: <strong>${escape(session.participant)}</strong><br>Session code: <strong>${escape(session.id)}</strong></p><p>Keep these codes to ask the supervising researcher to delete downloaded copies. You can also leave now to withdraw your responses.</p><button id="delete-local">Delete local session</button></section>`, 'Complete');
+      $('#delete-local').onclick = requestDelete; break;
+    case 'declined':
+    case 'withdrawn':
+      shell(`<section class="reading"><p class="caption">Participation ended</p><h1 tabindex="-1">${session.phase === 'declined' ? 'You chose not to take part.' : 'You have left the experiment.'}</h1><p>No more answers are required. Your recorded responses and questionnaire have been discarded from this session; only its consent/exit record remains if saving succeeded. This session cannot resume.</p><p>Participant code: <strong>${escape(session.participant)}</strong><br>Session code: <strong>${escape(session.id)}</strong></p><p>Ask the supervising researcher to remove any previously downloaded CSVs, backups and scored copies using these codes. Local deletion cannot remove those files.</p><button id="delete-local">Delete local session</button></section>`, 'Participation ended');
+      $('#delete-local').onclick = requestDelete; break;
   }
 }
 document.addEventListener('visibilitychange', () => {

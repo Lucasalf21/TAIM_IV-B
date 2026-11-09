@@ -2,8 +2,11 @@
 * {box-sizing: border-box;}
 body {margin: 0;}
 header, main, footer {width: min(1100px, calc(100% - 64px)); margin-inline: auto;}
-header {display: flex; justify-content: space-between; align-items: center; padding-block: 24px; border-bottom: 1px solid var(--line); gap: 20px;}
+header {display: flex; justify-content: space-between; align-items: center; padding-block: 24px; border-bottom: 1px solid var(--line); gap: 20px; position: sticky; top: 0; background: #000; z-index: 2;}
 .brand {font-size: 15px; color: var(--muted);}
+nav {display: flex; flex-wrap: wrap; gap: 12px;}
+dialog {max-width: min(640px, calc(100% - 32px)); color: #e5e8e8; background: #000; border: 1px solid #728282; padding: 28px;}
+dialog::backdrop {background: #000b;}
 main {min-height: 70vh; padding-block: 32px 64px;}
 h1, h2, h3, p {margin-top: 0;}
 h1 {font-size: clamp(32px, 4.4vw, 52px); line-height: 1.15; font-weight: 500; letter-spacing: -1.5px; margin-bottom: 24px; outline: none;}
