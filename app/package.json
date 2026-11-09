@@ -1,0 +1,17 @@
+{
+  "name": "taim-ivb-experiment",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {"node": ">=22.18.0"},
+  "scripts": {
+    "prepare:data": "node scripts/prepare-data.mjs",
+    "dev": "npm run prepare:data && vite --host 127.0.0.1",
+    "build": "npm run prepare:data && tsc --noEmit && vite build && node scripts/check-bundle.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test src/core.test.ts scripts/data.test.mjs && python3 -m unittest discover -s scripts -p 'test_*.py'",
+    "verify": "npm test && npm run build"
+  },
+  "dependencies": {"@observablehq/plot": "^0.6.17"},
+  "devDependencies": {"typescript": "^5.9.3", "vite": "^7.2.2"}
+}
