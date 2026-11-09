@@ -1,5 +1,37 @@
 # IV-3 rendering verification — protocol 3
 
+## UI makeover review — 2026-11-09
+
+Reviewed the complete uncommitted makeover in `src/main.ts`, `src/style.css` and
+`src/chart/frame.ts`, including the existing session and feedback callers. No
+blocking defects were found. Consent, scoring, response validation, episode order,
+timing, persistence and real-session readiness gates retain their existing logic.
+The shared chart's right margin increases from 24 to 96 pixels to place the limit
+label outside the data; the window label is centred. Domains, ticks, box summaries
+and the class palette are unchanged for both conditions.
+
+The production Chrome walkthrough at `127.0.0.1:4186` covered researcher setup,
+consent acceptance/refusal, instructions, both practices and their feedback, all
+20 measured trials (including probability questions), between-trial screens,
+questionnaire, results, completed-session researcher controls, withdrawal and the
+local-deletion dialog. Results showed 9/20 decision-quality matches for all-GO test
+responses and pending weather outcomes, as expected without a debrief import.
+At 390 × 844, results had no page-level horizontal overflow; the table scrolled
+inside its container. The desktop results Lighthouse snapshot scored 100 for
+accessibility and 100 for best practices; no console errors or warnings appeared.
+Screenshots and that report are in ignored `test-results/ui-makeover-review/`.
+
+A final isolated-browser check confirmed keyboard Tab focuses the GO radio with
+a visible 3-pixel orange outline on its label, confidence starts blank with bounds
+50–100, and both chart annotations fit inside the SVG. Final `npm run verify`
+passed 19 Node tests, 5 Python tests, TypeScript, the production build and the
+participant-bundle scoring-field guard. `git diff --check` passed.
+
+This is a software/UI review, not a human pilot. Real pilot/study modes remain
+blocked. Browser debrief file-picker verification remains incomplete because the
+upload tool denied workspace file access; the scorer-to-feedback integration is
+covered by automated tests. No dependencies or IV-4 project files were changed.
+
 ## End-of-session feedback addition
 
 The app now computes decision-quality feedback only after the questionnaire. The

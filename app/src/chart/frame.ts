@@ -12,7 +12,7 @@ export interface Renderer {
 }
 export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
   const chart = Plot.plot({
-    width: 900, height: 440, marginLeft: 65, marginRight: 24, marginTop: 42, marginBottom: 54,
+    width: 900, height: 440, marginLeft: 65, marginRight: 96, marginTop: 42, marginBottom: 54,
     style: {background: THEME.background, color: THEME.text, fontSize: '14px', fontFamily: 'inherit'},
     ariaLabel: 'Wind speed at 100 metres over time. Highlighted transfer window starts at zero hours; limit is 5 metres per second.',
     x: {domain: [-48, 3], label: 'Hours relative to transfer', ticks: [-48, -36, -24, -12, 0, 3]},
@@ -22,8 +22,9 @@ export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
       Plot.ruleY([context.threshold], {stroke: THEME.alternate, strokeDasharray: '6,4'}),
       Plot.ruleX([0], {stroke: THEME.highlight, strokeOpacity: 0.6}),
       ...marks,
-      Plot.text([{x: -45, y: context.threshold, label: '5 m/s limit'}], {x: 'x', y: 'y', text: 'label', textAnchor: 'start', dy: -12, fill: THEME.alternate}),
-      Plot.text([{x: 1.5, y: context.yMax, label: '3 h window'}], {x: 'x', y: 'y', text: 'label', textAnchor: 'end', dy: -18, fill: THEME.highlight})
+      // Labels sit outside the data area (right margin / above the window) so they never cover marks.
+      Plot.text([{x: 3, y: context.threshold, label: '5 m/s limit'}], {x: 'x', y: 'y', text: 'label', textAnchor: 'start', dx: 8, fill: THEME.alternate, clip: false}),
+      Plot.text([{x: 1.5, y: context.yMax, label: '3 h window'}], {x: 'x', y: 'y', text: 'label', textAnchor: 'middle', dy: -18, fill: THEME.highlight})
     ]
   });
   // Plot labels SVG groups without roles; explicit grouping keeps those labels valid.
