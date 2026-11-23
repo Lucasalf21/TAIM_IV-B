@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {boxSummaries, iv3} from './iv3.ts';
-import {iv4} from './iv4.ts';
+import {dotSeries, iv4} from './iv4.ts';
 import {contextFor, practiceEpisode} from './frame.ts';
 import type {Dataset, Episode} from '../core.ts';
 
@@ -41,6 +41,10 @@ test('invalid member alignment rejected, rendering availability is separate from
   assert.throws(() => boxSummaries(nonfinite));
   assert.equal(iv3.implemented, true);
   assert.equal(iv3.readyForStudy, false);
-  assert.ok(!iv4.implemented);
+  assert.equal(iv4.implemented, true);
   assert.equal(iv4.readyForStudy, false);
+  assert.equal(dotSeries(episode).length, episode.members.length * episode.hours.length);
+  assert.throws(() => dotSeries({...episode, members: episode.members.slice(1)}));
+  const brokenDots = structuredClone(episode); brokenDots.members[0].pop();
+  assert.throws(() => dotSeries(brokenDots));
 });

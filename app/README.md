@@ -1,8 +1,7 @@
 # IV-B shared experiment template
 
 English-only, supervised browser experiment shared by IV-3 (box-plot series) and IV-4
-(unconnected dot series). IV-3 renders real box-plot series; IV-4 remains a placeholder
-in this shared app. Both renderers have `readyForStudy: false`. Only **simulated** sessions
+(unconnected dot series). Both IV-3 and IV-4 render real charts in this shared app. Both renderers have `readyForStudy: false`. Only **simulated** sessions
 can run. A simulated session is software verification, not a human pilot or study.
 
 ## Run locally
@@ -112,7 +111,7 @@ Implemented encodings render in simulated mode too. `implemented` controls actua
 chart availability; `readyForStudy` remains false until the real-session readiness
 review. Select IV-3 + Simulated walkthrough to inspect both practices and all 20
 actual episodes. Simulation exports remain marked and rejected by the scorer by default.
-IV-4 still shows an empty frame here; its separate Flask project is not changed.
+IV-4 renders ten unconnected ensemble-member dots at each timestep in the shared app.
 
 Before collecting human data, review the implementation and agreed protocol with IV-4,
 arrange the two-person pilot, then enable the appropriate real-session readiness flag

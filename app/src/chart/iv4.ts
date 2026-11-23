@@ -1,4 +1,30 @@
+import * as Plot from '@observablehq/plot';
+import type {Episode} from '../core.ts';
+import {THEME} from './frame.ts';
 import type {Renderer} from './frame.ts';
 
-// Implement each member value as an unconnected dot at each timestep.
-export const iv4: Renderer = {readyForStudy: false, marks: () => []};
+export function dotSeries(episode: Episode) {
+  if (!episode.hours.length || episode.members.length !== 10 ||
+    episode.members.some(member => member.length !== episode.hours.length)) {
+    throw Error('A dot series requires ten aligned members.');
+  }
+  return episode.members.flatMap((member, memberIndex) => member.map((value, step) => {
+    if (!Number.isFinite(episode.hours[step]) || !Number.isFinite(value)) {
+      throw Error('Dot series values must be finite.');
+    }
+    return {hour: episode.hours[step], value, member: memberIndex + 1};
+  }));
+}
+
+export const iv4: Renderer = {
+  implemented: true,
+  readyForStudy: false,
+  marks: ({episode}) => {
+    const dots = dotSeries(episode);
+    return [Plot.dot(dots, {
+      x: 'hour', y: 'value', r: 4.5, fill: THEME.item,
+      stroke: THEME.highlight, strokeWidth: 0.5, clip: true,
+      ariaDescription: 'Unconnected ensemble member values'
+    })];
+  }
+};
