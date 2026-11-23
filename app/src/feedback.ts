@@ -5,7 +5,7 @@ export interface OutcomeFeedback {
   trials: {episode: string; decision: Decision; observed: 0 | 1}[];
 }
 export function feedbackRows(s: Session, data: Dataset, outcomes?: OutcomeFeedback) {
-  if (s.phase !== 'complete' || !s.questionnaire || s.cursor !== 22 || s.sequence.length !== 20 || s.dataset !== data.version) throw Error('Feedback is available only after the trials and questionnaire are complete.');
+  if (s.phase !== 'complete' || !s.questionnaire || s.cursor !== 20 || s.sequence.length !== 20 || s.dataset !== data.version) throw Error('Feedback is available only after the trials and questionnaire are complete.');
   return s.sequence.map((id, i) => {
     const a = s.attempts.find(a => !a.practice && a.status === 'submitted' && a.episode === id);
     const e = data.episodes.find(e => e.id === id);

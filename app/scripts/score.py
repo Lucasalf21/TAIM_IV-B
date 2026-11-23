@@ -13,7 +13,7 @@ APP = Path(__file__).resolve().parents[1]
 def validate_session(row):
     if row['phase'] != 'complete' or row['session_phase'] != 'complete' or row['withdrawn_at']:
         raise ValueError('Session is incomplete, declined or withdrawn; do not score its exports.')
-    if row['consent_version'] != 'ivb-consent-2026-11-09' or not row['consent_at']:
+    if row['consent_version'] != 'ivb-consent-2026-11-23' or not row['consent_at']:
         raise ValueError('Session does not have current recorded consent.')
     datetime.fromisoformat(row['consent_at'].replace('Z', '+00:00'))
 
@@ -96,7 +96,7 @@ def main():
                 parser.error(f'Trials do not match the latest session record: {field}.')
         if row['mode'] not in ('study', 'pilot', 'simulated') or row['condition'] not in ('IV-3', 'IV-4'):
             parser.error('Unknown mode or condition.')
-        if row['protocol'] != 'ivb-template-3' or row['dataset_version'] != manifest['version']:
+        if row['protocol'] != 'ivb-template-4' or row['dataset_version'] != manifest['version']:
             parser.error('Export protocol or dataset version does not match this scorer.')
         if row['mode'] == 'simulated' and not args.allow_simulated:
             parser.error('Simulation export rejected. --allow-simulated is for software checks only.')

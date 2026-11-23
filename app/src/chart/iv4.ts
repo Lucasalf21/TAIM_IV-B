@@ -12,7 +12,7 @@ export function dotSeries(episode: Episode) {
     if (!Number.isFinite(episode.hours[step]) || !Number.isFinite(value)) {
       throw Error('Dot series values must be finite.');
     }
-    return {hour: episode.hours[step], value, member: memberIndex + 1};
+    return {hour: episode.hours[step] + 1.5, value, member: memberIndex + 1};
   }));
 }
 
@@ -22,8 +22,8 @@ export const iv4: Renderer = {
   marks: ({episode}) => {
     const dots = dotSeries(episode);
     return [Plot.dot(dots, {
-      x: 'hour', y: 'value', r: 4.5, fill: THEME.item,
-      stroke: THEME.highlight, strokeWidth: 0.5, clip: true,
+      x: 'hour', y: 'value', r: 5.5, fill: THEME.item,
+      stroke: THEME.background, strokeWidth: 1.5, clip: true,
       ariaDescription: 'Unconnected ensemble member values'
     })];
   }
