@@ -2,14 +2,21 @@ export type Condition = 'IV-3' | 'IV-4';
 export type Mode = 'simulated' | 'pilot' | 'study';
 export type Decision = 'GO' | 'CANCEL';
 import {CONSENT_VERSION} from './consent.ts';
-export type Phase = 'consent' | 'instructions' | 'trial' | 'between' | 'questionnaire' | 'complete' | 'declined' | 'withdrawn';
-export interface Episode {id: string; hours: number[]; members: number[][]; windowStart: number; observed: 0 | 1}
+export type Phase = 'consent' | 'demographics' | 'instructions' | 'trial' | 'feedback' | 'between' | 'questionnaire' | 'complete' | 'declined' | 'withdrawn';
+export interface Episode {id: string; hours: number[]; members: number[][]; windowStart: number}
 export interface Dataset {version: string; threshold: number; windowHours: number; episodes: Episode[]}
 export const PROTOCOL = 'ivb-template-4';
 export const STORAGE_KEY = 'taim-ivb-session-v1';
 export const PROBABILITY_EPISODES = ['E01', 'E07', 'E10', 'E13', 'E16'];
 export const TLX = ['mental', 'physical', 'temporal', 'performance', 'effort', 'frustration'] as const;
 export type Questionnaire = Record<typeof TLX[number], number> & {comments: string};
+export interface Demographics {
+  age: string;
+  field: string;
+  chartFamiliarity: number;
+  weatherFamiliarity: number;
+  normalColorVision: string;
+}
 export interface Attempt {
   episode: string; practice: boolean; position: number; attempt: number;
   started: string; ended?: string; status: 'active' | 'interrupted' | 'submitted';
@@ -20,6 +27,7 @@ export interface Session {
   schema: 1; protocol: string; dataset: string; id: string; participant: string;
   condition: Condition; mode: Mode; orderRow: number; sequence: string[];
   created: string; phase: Phase; cursor: number; attempts: Attempt[];
+  demographics?: Demographics;
   questionnaire?: Questionnaire; completed?: string;
   consent?: {version: string; accepted: string};
   withdrawn?: string;
@@ -40,8 +48,18 @@ export function createSession(participant: string, condition: Condition, mode: M
     created: new Date().toISOString(), phase: 'consent', cursor: 0, attempts: []};
 }
 export function acceptConsent(s: Session, agreed: boolean): Session {
-  if (s.phase !== 'consent' || agreed !== true) throw Error('Explicit consent is required before the experiment.');
-  return {...s, consent: {version: CONSENT_VERSION, accepted: new Date().toISOString()}, phase: 'instructions'};
+  if (s.phase !== 'consent' || agreed !== true) throw Error('Explicit consent is required before practice.');
+  return {...s, consent: {version: CONSENT_VERSION, accepted: new Date().toISOString()}, phase: 'demographics'};
+}
+export function submitDemographics(s: Session, demographics: Demographics): Session {
+  if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required.');
+  if (s.phase !== 'demographics') throw Error('Demographics form is not active.');
+  if (!demographics.age || !demographics.field || !demographics.normalColorVision ||
+      !Number.isFinite(demographics.chartFamiliarity) || demographics.chartFamiliarity < 1 || demographics.chartFamiliarity > 5 ||
+      !Number.isFinite(demographics.weatherFamiliarity) || demographics.weatherFamiliarity < 1 || demographics.weatherFamiliarity > 5) {
+    throw Error('Please answer all questions before continuing.');
+  }
+  return {...s, demographics, phase: 'instructions'};
 }
 export function withdraw(s: Session): Session {
   if (['declined', 'withdrawn'].includes(s.phase)) return s;
@@ -60,7 +78,7 @@ export function current(s: Session) {
 }
 export function begin(s: Session): Session {
   if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required before any trial.');
-  if (!['instructions', 'between'].includes(s.phase)) throw Error('Cannot begin a trial now.');
+  if (!['instructions', 'between', 'demographics'].includes(s.phase)) throw Error('Cannot begin a trial now.');
   const next = structuredClone(s);
   if (next.cursor === 20) { next.phase = 'questionnaire'; return next; }
   const item = current(next);
@@ -107,8 +125,8 @@ export function recover(text: string, data: Dataset): Session {
     typeof s.id !== 'string' || !s.id || !date(s.created) ||
     !/^[A-Za-z0-9_-]{1,32}$/.test(s.participant) || !['IV-3', 'IV-4'].includes(s.condition) ||
     !['simulated', 'pilot', 'study'].includes(s.mode) ||
-    !['consent', 'instructions', 'trial', 'between', 'questionnaire', 'complete', 'declined', 'withdrawn'].includes(s.phase) ||
-    !Number.isInteger(s.cursor) || s.cursor < 0 || s.cursor > 20 || !Array.isArray(s.attempts) ||
+    !['consent', 'demographics', 'instructions', 'trial', 'feedback', 'between', 'questionnaire', 'complete', 'declined', 'withdrawn'].includes(s.phase) ||
+    !Number.isInteger(s.cursor) || s.cursor < 0 || s.cursor > 22 || !Array.isArray(s.attempts) ||
     JSON.stringify(s.sequence) !== JSON.stringify(latinSquare(data.episodes.map(e => e.id), s.orderRow))) {
     throw Error('Saved session is incompatible or damaged. Export its backup before starting again.');
   }
@@ -142,9 +160,10 @@ export function recover(text: string, data: Dataset): Session {
     completed++;
   }
   if (completed !== s.cursor ||
-    (s.phase === 'instructions' && s.cursor !== 0) ||
-    (['questionnaire', 'complete'].includes(s.phase) && s.cursor !== 20) ||
-    (s.phase === 'trial' && s.cursor === 20)) throw Error('Saved trial history is inconsistent.');
+    ((['demographics', 'instructions'].includes(s.phase)) && s.cursor !== 0) ||
+    (s.phase === 'feedback' && (s.cursor < 1 || s.cursor > 2 || s.attempts.at(-1)?.status !== 'submitted')) ||
+    (['questionnaire', 'complete'].includes(s.phase) && s.cursor !== 22) ||
+    (s.phase === 'trial' && s.cursor === 22)) throw Error('Saved trial history is inconsistent.');
   if (s.phase === 'complete') {
     if (!date(s.completed) || !s.questionnaire) throw Error('Saved questionnaire is damaged.');
     finish({...s, phase: 'questionnaire'}, s.questionnaire);
@@ -153,7 +172,7 @@ export function recover(text: string, data: Dataset): Session {
     const a = s.attempts.at(-1);
     if (!a || a.status !== 'active' || a.episode !== current(s).id) throw Error('Saved active trial is damaged.');
     a.status = 'interrupted'; a.ended = new Date().toISOString(); a.flags.push('recovered-interruption');
-    s.phase = s.cursor === 0 ? 'instructions' : 'between';
+    s.phase = s.cursor === 0 ? (s.demographics ? 'instructions' : 'demographics') : 'between';
   }
   return s;
 }
@@ -173,8 +192,10 @@ export function exportsFor(s: Session) {
   const common = ['session_id', 'participant_id', 'condition', 'mode', 'protocol', 'dataset_version', 'order_row', 'session_phase', 'consent_version', 'consent_at', 'withdrawn_at'];
   const values = [s.id, s.participant, s.condition, s.mode, s.protocol, s.dataset, s.orderRow, s.phase, s.consent?.version, s.consent?.accepted, s.withdrawn];
   const q = s.questionnaire;
+  const d = s.demographics;
   return {
-    session: csv([...common, 'created', 'completed', 'phase', 'sequence'], [[...values, s.created, s.completed, s.phase, s.sequence.join('|')]]),
+    session: csv([...common, 'created', 'completed', 'phase', 'sequence', 'age', 'field_of_study', 'chart_familiarity', 'weather_familiarity', 'normal_color_vision'],
+      [[...values, s.created, s.completed, s.phase, s.sequence.join('|'), d?.age ?? '', d?.field ?? '', d?.chartFamiliarity ?? '', d?.weatherFamiliarity ?? '', d?.normalColorVision ?? '']]),
     trials: csv([...common, 'episode', 'practice', 'position', 'attempt', 'status', 'repeated_exposure', 'started', 'ended', 'decision', 'confidence', 'probability', 'duration_ms', 'flags'],
       s.attempts.map(a => [...values, a.episode, a.practice, a.position, a.attempt, a.status, a.repeated, a.started, a.ended, a.decision, a.confidence, a.probability, a.durationMs, a.flags.join('|')])),
     questionnaire: csv([...common, ...TLX, 'raw_tlx', 'comments'], q ? [[...values, ...TLX.map(k => q[k]), TLX.reduce((n, k) => n + q[k], 0) / 6, q.comments]] : [])
