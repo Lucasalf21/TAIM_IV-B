@@ -1,9 +1,9 @@
 import './style.css';
 import source from './generated/stimuli.json';
 import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, finishPractice, PROBABILITY_EPISODES,
-  recover, save, STORAGE_KEY, submit, TLX, withdraw} from './core.ts';
+  recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import {CONSENT_HTML, CONSENT_VERSION} from './consent.ts';
-import type {Condition, Dataset, Mode, Questionnaire, Session} from './core.ts';
+import type {Condition, Dataset, Demographics, Mode, Questionnaire, Session} from './core.ts';
 import {contextFor, practiceEpisode, renderFrame} from './chart/frame.ts';
 import {iv3} from './chart/iv3.ts';
 import {iv4} from './chart/iv4.ts';
@@ -11,7 +11,7 @@ import {feedbackRows, readOutcomeFeedback} from './feedback.ts';
 import type {OutcomeFeedback} from './feedback.ts';
 
 const data: Dataset = source;
-const renderers = {'IV-3': iv3, 'IV-4': iv4};
+const renderers = { 'IV-3': iv3, 'IV-4': iv4 };
 const root = document.querySelector<HTMLDivElement>('#app')!;
 let session: Session | undefined;
 let saved: string | null = null;
@@ -21,7 +21,7 @@ let busy = false;
 let storageFailed = false;
 let changedElsewhere = false;
 let outcomes: OutcomeFeedback | undefined;
-const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]!));
+const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
 
 function notice(message: string) {
@@ -33,9 +33,11 @@ function commit(next: Session): boolean {
     notice('Another tab changed the saved session. Export this tab’s backup, then reload before continuing.');
     return false;
   }
-  try { save(localStorage, next); session = next; saved = JSON.stringify(next); storageFailed = false;
+  try {
+    save(localStorage, next); session = next; saved = JSON.stringify(next); storageFailed = false;
     if (outcomes?.sessionId !== next.id || next.phase !== 'complete') outcomes = undefined;
-    return true; }
+    return true;
+  }
   catch (error) {
     storageFailed = true;
     if (session?.phase === 'trial') session.attempts.at(-1)!.flags.push('storage-write-failure');
@@ -49,7 +51,7 @@ function action(fn: () => Session, showParticipant = false) {
   finally { busy = false; }
 }
 function download(name: string, text: string, type = 'text/csv;charset=utf-8') {
-  const url = URL.createObjectURL(new Blob([text], {type}));
+  const url = URL.createObjectURL(new Blob([text], { type }));
   const link = document.createElement('a'); link.href = url; link.download = name; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -125,7 +127,7 @@ function setup() {
     <div class="stack"><section class="card" aria-labelledby="saved-title"><div class="card-head"><h2 id="saved-title">Saved work</h2><span class="status${saved || session ? ' on' : ''}">${saved || session ? 'Stored locally' : 'Empty'}</span></div><p id="saved-status">${status}</p>
       <div class="actions"><button class="secondary" id="recover" ${saved ? '' : 'disabled'}>Recover saved session</button><button class="secondary" id="backup" ${saved || session ? '' : 'disabled'}>Export JSON backup</button><button class="danger" id="delete-local" ${saved || session ? '' : 'disabled'}>Delete local session</button></div></section>
       ${session ? '<section class="card" aria-labelledby="exports-title"><h2 id="exports-title">Researcher exports</h2><p class="hint">Export all three files separately. Practice and interrupted attempts remain marked. Back up files after every session.</p><div class="actions"><button class="secondary" data-export="session">Session CSV</button><button class="secondary" data-export="trials">Trials CSV</button><button class="secondary" data-export="questionnaire">Questionnaire CSV</button></div></section>' : ''}
-      ${session?.phase === 'complete' ? '<section class="card" aria-labelledby="debrief-title"><h2 id="debrief-title">End-of-session outcome feedback</h2><p class="hint">Export the session and trials CSVs, run scripts/score.py with the latest session CSV, then load the generated .debrief.json file. Outcomes are shown only after the questionnaire.</p><label>Completed-session debrief file<input id="debrief-file" type="file" accept="application/json,.json"></label><p id="debrief-status" class="status'+(outcomes ? ' on' : '')+'">'+(outcomes ? 'Outcome feedback loaded. Open Participant screen to show it.' : 'No outcome feedback file loaded.')+'</p></section>' : ''}
+      ${session?.phase === 'complete' ? '<section class="card" aria-labelledby="debrief-title"><h2 id="debrief-title">End-of-session outcome feedback</h2><p class="hint">Export the session and trials CSVs, run scripts/score.py with the latest session CSV, then load the generated .debrief.json file. Outcomes are shown only after the questionnaire.</p><label>Completed-session debrief file<input id="debrief-file" type="file" accept="application/json,.json"></label><p id="debrief-status" class="status' + (outcomes ? ' on' : '') + '">' + (outcomes ? 'Outcome feedback loaded. Open Participant screen to show it.' : 'No outcome feedback file loaded.') + '</p></section>' : ''}
       <section class="card" aria-labelledby="settings-title"><h2 id="settings-title">Study settings</h2><dl class="settings"><dt>Trials</dt><dd>2 practices + 20 episodes</dd><dt>Transfer window</dt><dd>3 hours</dd><dt>Wind limit</dt><dd>5 m/s at 100 m</dd><dt>Costs</dt><dd>€5,000 cancel / €40,000 abort</dd></dl></section>
     </div></div>`, 'Researcher setup');
   $('#setup').onsubmit = event => {
@@ -168,33 +170,120 @@ function setup() {
 function results() {
   const s = session!;
   const rows = feedbackRows(s, data, outcomes);
-  const money = (v: number) => new Intl.NumberFormat('en-IE', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(v);
+  const totalDurationMs = s.attempts
+    .filter(a => a.status === 'submitted')
+    .reduce((sum, a) => sum + (a.durationMs ?? 0), 0);
+  const totalSec = Math.round(totalDurationMs / 1000);
+  const totalDurationStr = totalSec >= 60
+    ? `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`
+    : `${totalSec}s`;
+  const money = (v: number) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
   const pending = '<span class="pending-cell">Pending</span>';
   const badge = (ok: boolean, yes: string, no: string) => `<span class="badge ${ok ? 'good' : 'bad'}"><span aria-hidden="true">${ok ? '✓' : '✕'}</span>${ok ? yes : no}</span>`;
   shell(`<section class="page-head"><p class="eyebrow">Session complete</p><h1 tabindex="-1">Your decisions, explained.</h1>
-    <p class="lead">All trials and your workload questionnaire are finished. This feedback does not change your saved answers.</p></section>
+    <p class="lead">All trials and your workload questionnaire are finished. Total time elapsed: <strong>${totalDurationStr}</strong>. This feedback does not change your saved answers.</p></section>
     <div class="result-groups"><section class="card result-group" aria-labelledby="quality-title"><p class="eyebrow">Measure 1</p><h2 id="quality-title">Decision quality</h2>
-      <div class="stat-row"><p class="stat"><strong>${rows.filter(r => r.goodDecision).length} / 20</strong><span>Choices that minimise expected cost</span></p></div>
+      <div class="stat-row"><p class="stat"><strong>${rows.filter(r => r.goodDecision).length} / 20</strong><span>Choices that minimise expected cost</span></p><p class="stat"><strong>${totalDurationStr}</strong><span>Total time elapsed</span></p></div>
       <p><strong>Decision quality</strong> uses the ensemble probability and the stated costs: GO has expected cost probability × €40,000, whereas CANCEL costs €5,000. GO minimises expected cost below 12.5%; CANCEL above it. This assumes minimising average monetary cost.</p></section>
     <section class="card result-group" aria-labelledby="outcome-title"><p class="eyebrow">Measure 2</p><h2 id="outcome-title">Outcome agreement</h2>
-      <div class="stat-row"><p class="stat"><strong${outcomes ? '' : ' class="pending"'}>${outcomes ? rows.filter(r => r.matchedOutcome).length+' / 20' : 'Pending'}</strong><span>Choices matching recorded weather outcomes</span></p><p class="stat"><strong${outcomes ? '' : ' class="pending"'}>${outcomes ? money(rows.reduce((sum, r) => sum + r.cost!, 0)) : 'Pending'}</strong><span>Total realised scenario cost</span></p></div>
+      <div class="stat-row"><p class="stat"><strong${outcomes ? '' : ' class="pending"'}>${outcomes ? rows.filter(r => r.matchedOutcome).length + ' / 20' : 'Pending'}</strong><span>Choices matching recorded weather outcomes</span></p><p class="stat"><strong${outcomes ? '' : ' class="pending"'}>${outcomes ? money(rows.reduce((sum, r) => sum + r.cost!, 0)) : 'Pending'}</strong><span>Total realised scenario cost</span></p></div>
       <p><strong>Outcome agreement</strong> compares your choice with the recorded weather: GO when wind stayed at or below the limit; CANCEL when it went above. A sensible decision can have an unlucky outcome. Cancelling still costs €5,000 even if the weather turns out safe. The scenario costs are fictional.</p>
       ${outcomes ? '' : '<p class="simulation-note">Decision-quality feedback is ready. Ask the researcher to load this completed session’s outcome debrief to show recorded weather and realised costs. Outcomes stay outside the participant app until that file is loaded.</p>'}</section></div>
     <div class="results-table" role="region" aria-label="Per-trial results" tabindex="0"><table><caption>Your 20 measured decisions, in presentation order</caption>
     <colgroup span="2"></colgroup><colgroup span="3"></colgroup><colgroup span="3"></colgroup>
     <thead><tr><td colspan="2"></td><th scope="colgroup" colspan="3" class="group-start">Decision quality</th><th scope="colgroup" colspan="3" class="group-start">Outcome agreement</th></tr>
     <tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col" class="group-start">Ensemble chance above limit</th><th scope="col">Cost-minimising choice</th><th scope="col">Decision quality</th><th scope="col" class="group-start">Recorded wind</th><th scope="col">Outcome agreement</th><th scope="col">Scenario cost</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability*100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed === undefined ? pending : r.observed ? 'Above limit' : 'At/below limit'}</td><td>${r.matchedOutcome === undefined ? pending : badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${r.cost === undefined ? pending : money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
+    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed === undefined ? pending : r.observed ? 'Above limit' : 'At/below limit'}</td><td>${r.matchedOutcome === undefined ? pending : badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${r.cost === undefined ? pending : money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
     <p>Keep these codes to request deletion of downloaded copies. You can still leave to withdraw your responses.</p><div class="actions"><button class="danger" id="delete-local">Delete local session</button></div></section>`, 'Results');
   $('#delete-local').onclick = requestDelete;
 }
 function consent() {
   shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Participant information and consent</p><h1 tabindex="-1">Your choice to take part.</h1></div><div class="prose">${CONSENT_HTML}</div>
-    <form id="consent" class="consent-box"><h2>Consent</h2><label class="check"><input type="checkbox" name="agree" required> I have read this information, had an opportunity to ask questions, and freely agree to participate.</label><div class="actions"><button type="submit">I agree — continue to instructions</button><button type="button" class="secondary" id="decline">I do not consent</button></div></form>
+    <form id="consent" class="consent-box"><h2>Consent</h2><label class="check"><input type="checkbox" name="agree" required> I have read this information, had an opportunity to ask questions, and freely agree to participate.</label><div class="actions"><button type="submit">I agree — continue</button><button type="button" class="secondary" id="decline">I do not consent</button></div></form>
     <p class="version">Information version: ${CONSENT_VERSION}</p></section>`, 'Consent');
-  $('#consent').onsubmit = event => {event.preventDefault(); action(() => acceptConsent(session!, new FormData(event.target as HTMLFormElement).get('agree') === 'on'));};
+  $('#consent').onsubmit = event => { event.preventDefault(); action(() => acceptConsent(session!, new FormData(event.target as HTMLFormElement).get('agree') === 'on')); };
   $('#decline').onclick = leave;
+}
+function demographics() {
+  shell(`<section class="reading centered demographics-section">
+    <div class="page-head"><h1 tabindex="-1" class="accent-title">About you</h1></div>
+    <form id="demographics-form" class="demographics-form">
+      <fieldset class="demo-group">
+        <legend class="demo-legend">Age</legend>
+        <div class="pill-group">
+          ${['18-20', '21-23', '24-26', '27-30', '31 or more', 'Prefer not to say'].map(v =>
+            `<label class="pill-option"><input type="radio" name="age" value="${v}" required><span>${v}</span></label>`
+          ).join('')}
+        </div>
+      </fieldset>
+
+      <fieldset class="demo-group">
+        <legend class="demo-legend">Field of study or work</legend>
+        <div class="pill-group">
+          ${['Computing / informatics', 'Other engineering', 'Design / multimedia', 'Other'].map(v =>
+            `<label class="pill-option"><input type="radio" name="field" value="${v}" required><span>${v}</span></label>`
+          ).join('')}
+        </div>
+      </fieldset>
+
+      <fieldset class="demo-group">
+        <legend class="demo-legend">How familiar are you with reading statistical charts?</legend>
+        <div class="scale-wrap">
+          <div class="scale-boxes">
+            ${[1, 2, 3, 4, 5].map(v =>
+              `<label class="scale-option"><input type="radio" name="chartFamiliarity" value="${v}" required><span>${v}</span></label>`
+            ).join('')}
+          </div>
+          <div class="scale-labels">
+            <span>not at all</span>
+            <span>very</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="demo-group">
+        <legend class="demo-legend">How familiar are you with weather forecasts for outdoor activities (sailing, flying, hiking...)?</legend>
+        <div class="scale-wrap">
+          <div class="scale-boxes">
+            ${[1, 2, 3, 4, 5].map(v =>
+              `<label class="scale-option"><input type="radio" name="weatherFamiliarity" value="${v}" required><span>${v}</span></label>`
+            ).join('')}
+          </div>
+          <div class="scale-labels">
+            <span>not at all</span>
+            <span>very</span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="demo-group">
+        <legend class="demo-legend">Do you have normal colour vision?</legend>
+        <div class="pill-group">
+          ${['Yes', 'No', "Don't know"].map(v =>
+            `<label class="pill-option"><input type="radio" name="normalColorVision" value="${v}" required><span>${v}</span></label>`
+          ).join('')}
+        </div>
+      </fieldset>
+
+      <div class="actions centered" style="margin-top: 1.5rem;">
+        <button type="submit" id="continue-demo">Continue</button>
+      </div>
+    </form>
+  </section>`, 'About you');
+
+  $('#demographics-form').onsubmit = event => {
+    event.preventDefault();
+    const form = new FormData(event.target as HTMLFormElement);
+    const demo = {
+      age: String(form.get('age') ?? ''),
+      field: String(form.get('field') ?? ''),
+      chartFamiliarity: Number(form.get('chartFamiliarity')),
+      weatherFamiliarity: Number(form.get('weatherFamiliarity')),
+      normalColorVision: String(form.get('normalColorVision') ?? '')
+    };
+    action(() => submitDemographics(session!, demo));
+  };
 }
 function wireExports() {
   root.querySelectorAll<HTMLButtonElement>('[data-export]').forEach(button => button.onclick = () => {
@@ -269,10 +358,11 @@ function questionnaire() {
   };
 }
 function render() {
-  if (researcher) {setup(); return;}
-  if (!session) {researcher = true; setup(); return;}
+  if (researcher) { setup(); return; }
+  if (!session) { researcher = true; setup(); return; }
   switch (session.phase) {
     case 'consent': consent(); break;
+    case 'demographics': demographics(); break;
     case 'instructions': instructions(); break;
     case 'trial': trial(); break;
     case 'feedback': {

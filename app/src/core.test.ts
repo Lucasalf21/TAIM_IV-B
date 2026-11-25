@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, finishPractice, latinSquare, PROBABILITY_EPISODES,
-  recover, save, STORAGE_KEY, submit, TLX, withdraw} from './core.ts';
+  recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import type {Dataset, Session} from './core.ts';
 import {contextFor, practiceEpisode} from './chart/frame.ts';
 import {readFileSync} from 'node:fs';
@@ -9,10 +9,18 @@ const data: Dataset = {version: 'test', threshold: 5, windowHours: 3,
   episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0}))};
 const unconsented = () => createSession('P01', 'IV-3', 'simulated', 1, data, false);
 const create = () => acceptConsent(unconsented(), true);
-test('fixed 0–16 axis contains all real and practice values and rejects clipping', () => {
+test('dynamic Y axis boundaries with margin contain all real and practice values and threshold', () => {
   const real = JSON.parse(readFileSync(new URL('./generated/stimuli.json', import.meta.url), 'utf8')) as Dataset;
-  for (const episode of [...real.episodes, practiceEpisode(0), practiceEpisode(1)]) assert.equal(contextFor(real, episode).yMax, 16);
-  assert.throws(() => contextFor(real, {id: 'bad', hours: [0], windowStart: 0, members: [[16.01]]}));
+  for (const episode of [...real.episodes, practiceEpisode(0), practiceEpisode(1)]) {
+    const ctx = contextFor(real, episode);
+    const minVal = Math.min(...episode.members.flat());
+    const maxVal = Math.max(...episode.members.flat());
+    assert.ok(ctx.yMin <= minVal, `yMin ${ctx.yMin} must be <= minVal ${minVal}`);
+    assert.ok(ctx.yMax >= maxVal, `yMax ${ctx.yMax} must be >= maxVal ${maxVal}`);
+    assert.ok(ctx.yMin <= real.threshold, `yMin ${ctx.yMin} must be <= threshold`);
+    assert.ok(ctx.yMax >= real.threshold, `yMax ${ctx.yMax} must be >= threshold`);
+  }
+  assert.throws(() => contextFor(real, {id: 'bad', hours: [0], windowStart: 0, members: [[-1]]}));
 });
 test('consent is explicit, versioned and enforced beyond the screen', () => {
   const s = unconsented();
@@ -23,7 +31,7 @@ test('consent is explicit, versioned and enforced beyond the screen', () => {
   assert.throws(() => submit({...s, phase: 'trial'}, 'GO', '80', '', 1));
   const accepted = acceptConsent(s, true);
   assert.ok(accepted.consent?.accepted);
-  assert.equal(recover(JSON.stringify(accepted), data).phase, 'instructions');
+  assert.equal(recover(JSON.stringify(accepted), data).phase, 'demographics');
   assert.throws(() => recover(JSON.stringify({...accepted, consent: undefined}), data));
   for (const protocol of ['ivb-template-1', 'ivb-template-2']) assert.throws(() => recover(JSON.stringify({...accepted, protocol}), data));
 });
@@ -110,4 +118,24 @@ test('storage failure is explicit and CSV protects spreadsheet formulas', () => 
   assert.throws(() => save({setItem: () => {throw Error('quota');}}, create()), /could not be saved/);
   assert.match(csv(['comments'], [['=HYPERLINK("bad")']]), /'=HYPERLINK/);
   assert.equal(exportsFor(create()).questionnaire.split('\r\n').filter(Boolean).length, 1);
+});
+test('demographics collection, validation, transition, and CSV export', () => {
+  let s = acceptConsent(unconsented(), true);
+  assert.equal(s.phase, 'demographics');
+  assert.throws(() => submitDemographics(s, {
+    age: '', field: 'Computing / informatics', chartFamiliarity: 3, weatherFamiliarity: 3, normalColorVision: 'Yes'
+  }));
+  assert.throws(() => submitDemographics(s, {
+    age: '21-23', field: 'Computing / informatics', chartFamiliarity: 0, weatherFamiliarity: 3, normalColorVision: 'Yes'
+  }));
+  s = submitDemographics(s, {
+    age: '21-23', field: 'Computing / informatics', chartFamiliarity: 4, weatherFamiliarity: 2, normalColorVision: 'Yes'
+  });
+  assert.equal(s.phase, 'instructions');
+  assert.equal(s.demographics?.age, '21-23');
+  assert.equal(s.demographics?.chartFamiliarity, 4);
+  assert.equal(recover(JSON.stringify(s), data).phase, 'instructions');
+  const sessionCsv = exportsFor(s).session;
+  assert.match(sessionCsv, /"21-23"/);
+  assert.match(sessionCsv, /"Computing \/ informatics"/);
 });
