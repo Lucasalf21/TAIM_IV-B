@@ -26,8 +26,9 @@ export function prepare(raw) {
       assert.equal(member.length, e.times.length);
       member.forEach(v => assert.ok(Number.isFinite(v) && v >= 0));
     });
+    assert.ok(e.exceeded === 0 || e.exceeded === 1);
     return {id, hours: timestamps.map(t => (t - timestamps[e.window_start_index]) / 3600000),
-      members: e.members, windowStart: e.window_start_index};
+      members: e.members, windowStart: e.window_start_index, observed: e.exceeded};
   });
   const clean = {threshold: 5, windowHours: 3, episodes};
   const version = 'taim-ivb-' + createHash('sha256').update(JSON.stringify(clean)).digest('hex').slice(0, 16);

@@ -5,15 +5,14 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
-import {acceptConsent, begin, createSession, exportsFor, finish, finishPractice, submit, TLX, withdraw} from './core.ts';
+import {acceptConsent, begin, createSession, exportsFor, finish, submit, TLX, withdraw} from './core.ts';
 import type {Dataset, Questionnaire} from './core.ts';
 import {feedbackRows, readOutcomeFeedback} from './feedback.ts';
 const data = JSON.parse(readFileSync(new URL('./generated/stimuli.json', import.meta.url), 'utf8')) as Dataset;
 function complete() {
   let s = acceptConsent(createSession('FEEDBACK-TEST', 'IV-3', 'simulated', 1, data, false), true);
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 20; i++) {
     s = begin(s); s = submit(s, 'GO', '75', '20', 100);
-    if (s.phase === 'feedback') s = finishPractice(s);
   }
   s = begin(s);
   return finish(s, {...Object.fromEntries(TLX.map(k => [k, 20])), comments: ''} as Questionnaire);
@@ -26,7 +25,22 @@ test('decision feedback uses presentation order, all members, and the 12.5% cost
   assert.equal(rows.find(r => r.episode === 'E10')!.recommended, 'CANCEL');
   assert.equal(rows.find(r => r.episode === 'E13')!.probability, .3);
   assert.equal(rows.filter(r => r.goodDecision).length, 9);
-  assert.ok(rows.every(r => r.cost === undefined && r.matchedOutcome === undefined));
+  assert.ok(rows.every(r => r.cost !== undefined && r.matchedOutcome !== undefined));
+  const unluckyGo = rows.find(r => r.episode === 'E10')!;
+  assert.equal(unluckyGo.decision, 'GO');
+  assert.equal(unluckyGo.observed, 1);
+  assert.equal(unluckyGo.matchedOutcome, false);
+  assert.equal(unluckyGo.cost, 40000);
+  assert.equal(rows.filter(r => r.matchedOutcome).length, 13);
+  assert.equal(rows.reduce((total, row) => total + row.cost!, 0), 280000);
+});
+test('recorded outcomes must be binary before calculating agreement or cost', () => {
+  const invalid = structuredClone(data);
+  invalid.episodes.forEach(episode => { episode.observed = 2; });
+  assert.throws(() => feedbackRows(complete(), invalid), /Recorded episode outcome is invalid/);
+  const missing = structuredClone(data);
+  missing.episodes[0].observed = undefined;
+  assert.throws(() => feedbackRows(complete(), missing), /Recorded episode outcome is missing/);
 });
 test('outcomes are session-bound; sound decisions can have unlucky results', () => {
   const s = complete();

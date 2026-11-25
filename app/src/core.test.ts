@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, finishPractice, latinSquare, PROBABILITY_EPISODES,
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import type {Dataset, Session} from './core.ts';
-import {contextFor, practiceEpisode} from './chart/frame.ts';
+import {contextFor} from './chart/frame.ts';
 import {readFileSync} from 'node:fs';
 const data: Dataset = {version: 'test', threshold: 5, windowHours: 3,
-  episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0}))};
+  episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0, observed: 0 as const}))};
 const unconsented = () => createSession('P01', 'IV-3', 'simulated', 1, data, false);
 const create = () => acceptConsent(unconsented(), true);
 test('dynamic Y axis boundaries with margin contain all real and practice values and threshold', () => {
@@ -33,13 +33,13 @@ test('consent is explicit, versioned and enforced beyond the screen', () => {
   assert.ok(accepted.consent?.accepted);
   assert.equal(recover(JSON.stringify(accepted), data).phase, 'demographics');
   assert.throws(() => recover(JSON.stringify({...accepted, consent: undefined}), data));
-  for (const protocol of ['ivb-template-1', 'ivb-template-2']) assert.throws(() => recover(JSON.stringify({...accepted, protocol}), data));
+  for (const protocol of ['ivb-template-1', 'ivb-template-2', 'ivb-template-3']) assert.throws(() => recover(JSON.stringify({...accepted, protocol}), data));
 });
 test('declining and withdrawing discard responses and remain terminal after recovery', () => {
   const declined = withdraw(unconsented());
   assert.equal(declined.phase, 'declined');
   assert.equal(recover(JSON.stringify(declined), data).phase, 'declined');
-  let s = begin(create()); s = submit(s, 'GO', '80', '', 10); s = finishPractice(s); s = begin(s);
+  let s = begin(create()); s = submit(s, 'GO', '80', '20', 10); s = begin(s);
   const stopped = withdraw(s);
   assert.equal(stopped.phase, 'withdrawn');
   assert.equal(stopped.cursor, 0);
@@ -72,13 +72,12 @@ test('real modes blocked; anonymous ID validated', () => {
   for (const mode of ['pilot', 'study'] as const) assert.throws(() => createSession('P01', 'IV-3', mode, 1, data, false));
   assert.throws(() => createSession('person@example.com', 'IV-3', 'simulated', 1, data, false));
 });
-test('all practices, measured trials, scheduled questions and TLX export correctly', () => {
+test('all measured trials, scheduled questions and TLX export correctly', () => {
   let s = create();
-  for (let i = 0; i < 22; i++) {
+  for (let i = 0; i < 20; i++) {
     s = begin(s);
     s = submit(s, 'GO', '75', '20', 1234);
     assert.throws(() => submit(s, 'GO', '75', '20', 10));
-    if (s.phase === 'feedback') s = finishPractice(s);
   }
   s = begin(s);
   const q = {...Object.fromEntries(TLX.map(k => [k, 25])), comments: 'A comma, "quote"\nand a line'};
@@ -94,12 +93,12 @@ test('blank and out-of-range values rejected without mutating session', () => {
   for (const confidence of ['', '49', '101', 'NaN']) assert.throws(() => submit(s, 'GO', confidence, '', 1));
   assert.throws(() => submit(s, '', '60', '', 1));
   assert.equal(s.attempts[0].status, 'active');
-  s = {...s, cursor: 2, attempts: [{...s.attempts[0], episode: 'E01', practice: false}]};
+  s = {...s, cursor: 1, attempts: [{...s.attempts[0], episode: 'E01', practice: false}]};
   assert.throws(() => submit(s, 'GO', '60', '', 1));
   assert.equal(submit(s, 'GO', '60', '0', 1).attempts[0].probability, 0);
 });
 test('recovery preserves submitted work and records repeated exposure', () => {
-  let s = begin(create()); s = submit(s, 'GO', '80', '', 100); s = finishPractice(s); s = begin(s);
+  let s = begin(create()); s = submit(s, 'GO', '80', '20', 100); s = begin(s);
   s = recover(JSON.stringify(s), data);
   assert.equal(s.attempts[0].status, 'submitted');
   assert.equal(s.attempts[1].status, 'interrupted');

@@ -5,7 +5,7 @@ import {output, prepare} from './prepare-data.mjs';
 
 test('participant payload contains only allowlisted fields, preserving truncated lead-ups', () => {
   assert.deepEqual(Object.keys(output), ['version', 'threshold', 'windowHours', 'episodes']);
-  for (const e of output.episodes) assert.deepEqual(Object.keys(e), ['id', 'hours', 'members', 'windowStart']);
+  for (const e of output.episodes) assert.deepEqual(Object.keys(e), ['id', 'hours', 'members', 'windowStart', 'observed']);
   assert.equal(output.episodes.reduce((n, e) => n + e.hours.length * 10, 0), 3310);
   assert.equal(output.episodes.find(e => e.id === 'E13').hours.length, 16);
   assert.equal(output.episodes.find(e => e.id === 'E19').hours.length, 9);

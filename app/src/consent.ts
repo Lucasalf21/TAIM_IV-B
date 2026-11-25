@@ -1,9 +1,9 @@
 // Review this draft with IV-3/IV-4 before a human pilot; bump the version when wording changes.
-export const CONSENT_VERSION = 'ivb-consent-2026-11-09';
+export const CONSENT_VERSION = 'ivb-consent-2026-11-23';
 export const CONSENT_HTML = `
   <p>This TAIM coursework study at FEUP compares two ways of showing uncertain wind conditions. It is run by the IV-3 and IV-4 student teams.</p>
   <h2>What taking part involves</h2>
-  <p>You will read instructions, complete two practice examples and 20 wind-transfer decisions, and answer a short workload questionnaire. Allow approximately 15–20 minutes; this is an estimate. You may ask the supervising researcher questions before deciding.</p>
+  <p>You will read instructions, complete 20 wind-transfer decisions, and answer a short workload questionnaire. Allow approximately 15–20 minutes; this is an estimate. You may ask the supervising researcher questions before deciding.</p>
   <p>We collect GO/CANCEL choices, confidence ratings, some probability estimates, response times, questionnaire answers and optional comments. The euro amounts are fictional scenario costs, not payments or charges to you. There are no real operational decisions. You may experience mild tiredness or frustration.</p>
   <h2>Your choice</h2>
   <p>Participation is voluntary. You can decline or select <strong>Leave experiment</strong> at any time, without giving a reason or completing any remaining questions. There is no penalty for declining or stopping. Leaving discards your responses from this browser and retains only a session record showing that you stopped, until that record is deleted too.</p>

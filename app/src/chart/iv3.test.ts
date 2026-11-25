@@ -2,20 +2,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {boxSummaries, iv3} from './iv3.ts';
-import {iv4} from './iv4.ts';
-import {contextFor, practiceEpisode} from './frame.ts';
+import {dotSeries, iv4} from './iv4.ts';
+import {contextFor, xDomainFor, xTicks} from './frame.ts';
 import type {Dataset, Episode} from '../core.ts';
 
 test('quartiles use all ten members, with min–max whiskers including extreme values', () => {
-  const episode: Episode = {id: 'test', hours: [-3, 0], windowStart: 1,
+  const episode: Episode = {id: 'test', hours: [-3, 0], windowStart: 1, observed: 0,
     members: [0, 1, 2, 3, 4, 5, 6, 7, 8, 100].map(v => [v, 10 - v])};
   assert.deepEqual(boxSummaries(episode)[0], {hour: -3, min: 0, q25: 2.25, median: 4.5, q75: 6.75, max: 100});
   assert.equal(boxSummaries(episode)[1].min, -90);
   assert.deepEqual(episode.members[9], [100, -90]);
 });
-test('every real episode and both practices have one ordered summary per actual timestep', () => {
+test('every real episode has one ordered summary per actual timestep', () => {
   const data = JSON.parse(readFileSync(new URL('../generated/stimuli.json', import.meta.url), 'utf8')) as Dataset;
-  for (const episode of [...data.episodes, practiceEpisode(0), practiceEpisode(1)]) {
+  for (const episode of data.episodes) {
     const boxes = boxSummaries(episode);
     assert.equal(boxes.length, episode.hours.length);
     boxes.forEach((b, i) => {
@@ -29,11 +29,12 @@ test('every real episode and both practices have one ordered summary per actual 
   }
   assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E13')!).length, 16);
   assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E19')!).length, 9);
-  assert.ok(boxSummaries(practiceEpisode(0)).at(-1)!.max < 5);
-  assert.ok(boxSummaries(practiceEpisode(1)).at(-1)!.min > 5);
+  assert.deepEqual(xDomainFor(data.episodes.find(e => e.id === 'E13')!), [-45, 3]);
+  assert.deepEqual(xDomainFor(data.episodes.find(e => e.id === 'E19')!), [-24, 3]);
 });
 test('invalid member alignment rejected, rendering availability is separate from study readiness', () => {
-  const episode = practiceEpisode(0);
+  const episode = {id: 'test-invalid', hours: [-3, 0], windowStart: 1, observed: 0 as const,
+    members: [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16], [2, 3], [4, 5]]};
   assert.throws(() => boxSummaries({...episode, members: episode.members.slice(1)}));
   const broken = structuredClone(episode); broken.members[0].pop();
   assert.throws(() => boxSummaries(broken));
@@ -41,6 +42,14 @@ test('invalid member alignment rejected, rendering availability is separate from
   assert.throws(() => boxSummaries(nonfinite));
   assert.equal(iv3.implemented, true);
   assert.equal(iv3.readyForStudy, false);
-  assert.ok(!iv4.implemented);
+  assert.equal(iv4.implemented, true);
   assert.equal(iv4.readyForStudy, false);
+  assert.deepEqual(xTicks(-45), [-45, -36, -27, -18, -9, 0, 3]);
+  assert.deepEqual(xTicks(-24), [-24, -18, -12, -6, 0, 3]);
+  const dots = dotSeries(episode);
+  assert.equal(dots.length, episode.members.length * episode.hours.length);
+  assert.deepEqual(dots.filter(d => d.member === 1).map(d => d.hour), [-1.5, 1.5]);
+  assert.throws(() => dotSeries({...episode, members: episode.members.slice(1)}));
+  const brokenDots = structuredClone(episode); brokenDots.members[0].pop();
+  assert.throws(() => dotSeries(brokenDots));
 });
