@@ -4,7 +4,11 @@ export interface OutcomeFeedback {
   schema: 1; sessionId: string; dataset: string; protocol: string; condition: string; mode: string;
   trials: {episode: string; decision: Decision; observed: 0 | 1}[];
 }
-export function feedbackRows(s: Session, data: Dataset, outcomes?: OutcomeFeedback) {
+export interface FeedbackRow {
+  episode: string; position: number; decision: Decision; probability: number; recommended: Decision;
+  goodDecision: boolean; observed: 0 | 1; matchedOutcome: boolean; cost: number;
+}
+export function feedbackRows(s: Session, data: Dataset, outcomes?: OutcomeFeedback): FeedbackRow[] {
   if (s.phase !== 'complete' || !s.questionnaire || s.cursor !== 20 || s.sequence.length !== 20 || s.dataset !== data.version) throw Error('Feedback is available only after the trials and questionnaire are complete.');
   return s.sequence.map((id, i) => {
     const a = s.attempts.find(a => !a.practice && a.status === 'submitted' && a.episode === id);
@@ -13,10 +17,12 @@ export function feedbackRows(s: Session, data: Dataset, outcomes?: OutcomeFeedba
     const probability = e.members.filter(m => m.slice(e.windowStart).some(v => v > data.threshold)).length / e.members.length;
     const recommended: Decision = probability * 40000 <= 5000 ? 'GO' : 'CANCEL';
     const observed = outcomes?.trials[i].observed ?? e.observed;
+    if (observed === undefined) throw Error('Recorded episode outcome is missing.');
+    if (observed !== 0 && observed !== 1) throw Error('Recorded episode outcome is invalid.');
     return {episode: id, position: i + 1, decision: a.decision, probability, recommended,
       goodDecision: a.decision === recommended, observed,
-      matchedOutcome: observed === undefined ? undefined : a.decision === (observed ? 'CANCEL' : 'GO'),
-      cost: observed === undefined ? undefined : a.decision === 'CANCEL' ? 5000 : observed * 40000};
+      matchedOutcome: a.decision === (observed ? 'CANCEL' : 'GO'),
+      cost: a.decision === 'CANCEL' ? 5000 : observed * 40000};
   });
 }
 export function readOutcomeFeedback(text: string, s: Session, data: Dataset): OutcomeFeedback {

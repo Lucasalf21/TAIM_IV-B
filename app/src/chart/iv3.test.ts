@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {boxSummaries, iv3} from './iv3.ts';
 import {dotSeries, iv4} from './iv4.ts';
-import {contextFor, xTicks} from './frame.ts';
+import {contextFor, xDomainFor, xTicks} from './frame.ts';
 import type {Dataset, Episode} from '../core.ts';
 
 test('quartiles use all ten members, with min–max whiskers including extreme values', () => {
@@ -29,6 +29,8 @@ test('every real episode has one ordered summary per actual timestep', () => {
   }
   assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E13')!).length, 16);
   assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E19')!).length, 9);
+  assert.deepEqual(xDomainFor(data.episodes.find(e => e.id === 'E13')!), [-45, 3]);
+  assert.deepEqual(xDomainFor(data.episodes.find(e => e.id === 'E19')!), [-24, 3]);
 });
 test('invalid member alignment rejected, rendering availability is separate from study readiness', () => {
   const episode = {id: 'test-invalid', hours: [-3, 0], windowStart: 1, observed: 0 as const,
@@ -42,8 +44,8 @@ test('invalid member alignment rejected, rendering availability is separate from
   assert.equal(iv3.readyForStudy, false);
   assert.equal(iv4.implemented, true);
   assert.equal(iv4.readyForStudy, false);
-  assert.deepEqual(xTicks(-45), [-45, -42, -39, -36, -33, -30, -27, -24, -21, -18, -15, -12, -9, -6, -3, 0, 3]);
-  assert.deepEqual(xTicks(-24), [-24, -21, -18, -15, -12, -9, -6, -3, 0, 3]);
+  assert.deepEqual(xTicks(-45), [-45, -36, -27, -18, -9, 0, 3]);
+  assert.deepEqual(xTicks(-24), [-24, -18, -12, -6, 0, 3]);
   const dots = dotSeries(episode);
   assert.equal(dots.length, episode.members.length * episode.hours.length);
   assert.deepEqual(dots.filter(d => d.member === 1).map(d => d.hour), [-1.5, 1.5]);

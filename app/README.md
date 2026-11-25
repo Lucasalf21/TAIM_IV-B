@@ -100,9 +100,11 @@ IV-3 draws one box for each actual timestep, using all ten member values. Quarti
 use linear interpolation (R-7, matching NumPy's default percentile convention); whiskers
 reach the true minimum and maximum, with no outlier dots. Boxes use the class teal
 palette and a light median line. Marks are clipped to the shared frame; missing lead-up
-is not filled, and a boundary box at −48 h is clipped at that axis boundary. The
-instructions and chart legend explain the encoding. The transfer-time box is at 0 h;
-the 0–3 h shading indicates duration, not extra interpolated samples.
+is not filled. Each chart's x domain starts at that episode's first available hour and
+ends at +3 h; tick spacing adapts to the available lead-up. The boundary box at the
+first available hour is clipped at the left axis boundary. The instructions and chart
+legend explain the encoding. The transfer-time box is at 0 h; the 0–3 h shading
+indicates duration, not extra interpolated samples.
 
 Implemented encodings render in simulated mode too. `implemented` controls actual
 chart availability; `readyForStudy` remains false until the real-session readiness

@@ -1,6 +1,6 @@
 import './style.css';
 import source from './generated/stimuli.json';
-import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, finishPractice, PROBABILITY_EPISODES,
+import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, PROBABILITY_EPISODES,
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import {CONSENT_HTML, CONSENT_VERSION} from './consent.ts';
 import type {Condition, Dataset, Demographics, Mode, Questionnaire, Session} from './core.ts';
@@ -19,7 +19,6 @@ let clockStart: number | undefined;
 let busy = false;
 let storageFailed = false;
 let changedElsewhere = false;
-let outcomes: OutcomeFeedback | undefined;
 const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
 
@@ -34,7 +33,6 @@ function commit(next: Session): boolean {
   }
   try {
     save(localStorage, next); session = next; saved = JSON.stringify(next); storageFailed = false;
-    if (outcomes?.sessionId !== next.id || next.phase !== 'complete') outcomes = undefined;
     return true;
   }
   catch (error) {
@@ -125,8 +123,7 @@ function setup() {
     <div class="stack"><section class="card" aria-labelledby="saved-title"><div class="card-head"><h2 id="saved-title">Saved work</h2><span class="status${saved || session ? ' on' : ''}">${saved || session ? 'Stored locally' : 'Empty'}</span></div><p id="saved-status">${status}</p>
       <div class="actions"><button class="secondary" id="recover" ${saved ? '' : 'disabled'}>Recover saved session</button><button class="secondary" id="backup" ${saved || session ? '' : 'disabled'}>Export JSON backup</button><button class="danger" id="delete-local" ${saved || session ? '' : 'disabled'}>Delete local session</button></div></section>
       ${session ? '<section class="card" aria-labelledby="exports-title"><h2 id="exports-title">Researcher exports</h2><p class="hint">Export all three files separately. Practice and interrupted attempts remain marked. Back up files after every session.</p><div class="actions"><button class="secondary" data-export="session">Session CSV</button><button class="secondary" data-export="trials">Trials CSV</button><button class="secondary" data-export="questionnaire">Questionnaire CSV</button></div></section>' : ''}
-      ${session?.phase === 'complete' ? '<section class="card" aria-labelledby="debrief-title"><h2 id="debrief-title">End-of-session outcome feedback</h2><p class="hint">Export the session and trials CSVs, run scripts/score.py with the latest session CSV, then load the generated .debrief.json file. Outcomes are shown only after the questionnaire.</p><label>Completed-session debrief file<input id="debrief-file" type="file" accept="application/json,.json"></label><p id="debrief-status" class="status' + (outcomes ? ' on' : '') + '">' + (outcomes ? 'Outcome feedback loaded. Open Participant screen to show it.' : 'No outcome feedback file loaded.') + '</p></section>' : ''}
-      <section class="card" aria-labelledby="settings-title"><h2 id="settings-title">Study settings</h2><dl class="settings"><dt>Trials</dt><dd>2 practices + 20 episodes</dd><dt>Transfer window</dt><dd>3 hours</dd><dt>Wind limit</dt><dd>5 m/s at 100 m</dd><dt>Costs</dt><dd>€5,000 cancel / €40,000 abort</dd></dl></section>
+      <section class="card" aria-labelledby="settings-title"><h2 id="settings-title">Study settings</h2><dl class="settings"><dt>Trials</dt><dd>20 episodes</dd><dt>Transfer window</dt><dd>3 hours</dd><dt>Wind limit</dt><dd>5 m/s at 100 m</dd><dt>Costs</dt><dd>€5,000 cancel / €40,000 abort</dd></dl></section>
     </div></div>`, 'Researcher setup');
   $('#setup').onsubmit = event => {
     event.preventDefault();
@@ -150,7 +147,7 @@ function setup() {
 }
 function results() {
   const s = session!;
-  const rows = feedbackRows(s, data, outcomes);
+  const rows = feedbackRows(s, data);
   const totalDurationMs = s.attempts
     .filter(a => a.status === 'submitted')
     .reduce((sum, a) => sum + (a.durationMs ?? 0), 0);
@@ -159,7 +156,6 @@ function results() {
     ? `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`
     : `${totalSec}s`;
   const money = (v: number) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
-  const pending = '<span class="pending-cell">Pending</span>';
   const badge = (ok: boolean, yes: string, no: string) => `<span class="badge ${ok ? 'good' : 'bad'}"><span aria-hidden="true">${ok ? '✓' : '✕'}</span>${ok ? yes : no}</span>`;
   shell(`<section class="page-head"><p class="eyebrow">Session complete</p><h1 tabindex="-1">Your decisions, explained.</h1>
     <p class="lead">All trials and your workload questionnaire are finished. Total time elapsed: <strong>${totalDurationStr}</strong>. This feedback does not change your saved answers.</p></section>
@@ -167,14 +163,14 @@ function results() {
       <div class="stat-row"><p class="stat"><strong>${rows.filter(r => r.goodDecision).length} / 20</strong><span>Choices that minimise expected cost</span></p><p class="stat"><strong>${totalDurationStr}</strong><span>Total time elapsed</span></p></div>
       <p><strong>Decision quality</strong> uses the ensemble probability and the stated costs: GO has expected cost probability × €40,000, whereas CANCEL costs €5,000. GO minimises expected cost below 12.5%; CANCEL above it. This assumes minimising average monetary cost.</p></section>
     <section class="card result-group" aria-labelledby="outcome-title"><p class="eyebrow">Measure 2</p><h2 id="outcome-title">Outcome agreement</h2>
-      <div class="stat-row"><p class="stat"><strong${outcomes ? '' : ' class="pending"'}>${outcomes ? rows.filter(r => r.matchedOutcome).length + ' / 20' : 'Pending'}</strong><span>Choices matching recorded weather outcomes</span></p><p class="stat"><strong${outcomes ? '' : ' class="pending"'}>${outcomes ? money(rows.reduce((sum, r) => sum + r.cost!, 0)) : 'Pending'}</strong><span>Total realised scenario cost</span></p></div>
+      <div class="stat-row"><p class="stat"><strong>${rows.filter(r => r.matchedOutcome).length} / 20</strong><span>Choices matching recorded weather outcomes</span></p><p class="stat"><strong>${money(rows.reduce((sum, r) => sum + r.cost!, 0))}</strong><span>Total realised scenario cost</span></p></div>
       <p><strong>Outcome agreement</strong> compares your choice with the recorded weather: GO when wind stayed at or below the limit; CANCEL when it went above. A sensible decision can have an unlucky outcome. Cancelling still costs €5,000 even if the weather turns out safe. The scenario costs are fictional.</p>
       <p class="simulation-note">Recorded outcomes are disclosed only after the questionnaire.</p></section></div>
     <div class="results-table" role="region" aria-label="Per-trial results" tabindex="0"><table><caption>Your 20 measured decisions, in presentation order</caption>
     <colgroup span="2"></colgroup><colgroup span="3"></colgroup><colgroup span="3"></colgroup>
     <thead><tr><td colspan="2"></td><th scope="colgroup" colspan="3" class="group-start">Decision quality</th><th scope="colgroup" colspan="3" class="group-start">Outcome agreement</th></tr>
     <tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col" class="group-start">Ensemble chance above limit</th><th scope="col">Cost-minimising choice</th><th scope="col">Decision quality</th><th scope="col" class="group-start">Recorded wind</th><th scope="col">Outcome agreement</th><th scope="col">Scenario cost</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed === undefined ? pending : r.observed ? 'Above limit' : 'At/below limit'}</td><td>${r.matchedOutcome === undefined ? pending : badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${r.cost === undefined ? pending : money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
+    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
     <p>Keep these codes to request deletion of downloaded copies. You can still leave to withdraw your responses.</p><div class="actions"><button class="danger" id="delete-local">Delete local session</button></div></section>`, 'Results');
   $('#delete-local').onclick = requestDelete;

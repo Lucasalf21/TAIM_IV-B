@@ -26,6 +26,21 @@ test('decision feedback uses presentation order, all members, and the 12.5% cost
   assert.equal(rows.find(r => r.episode === 'E13')!.probability, .3);
   assert.equal(rows.filter(r => r.goodDecision).length, 9);
   assert.ok(rows.every(r => r.cost !== undefined && r.matchedOutcome !== undefined));
+  const unluckyGo = rows.find(r => r.episode === 'E10')!;
+  assert.equal(unluckyGo.decision, 'GO');
+  assert.equal(unluckyGo.observed, 1);
+  assert.equal(unluckyGo.matchedOutcome, false);
+  assert.equal(unluckyGo.cost, 40000);
+  assert.equal(rows.filter(r => r.matchedOutcome).length, 13);
+  assert.equal(rows.reduce((total, row) => total + row.cost!, 0), 280000);
+});
+test('recorded outcomes must be binary before calculating agreement or cost', () => {
+  const invalid = structuredClone(data);
+  invalid.episodes.forEach(episode => { episode.observed = 2; });
+  assert.throws(() => feedbackRows(complete(), invalid), /Recorded episode outcome is invalid/);
+  const missing = structuredClone(data);
+  missing.episodes[0].observed = undefined;
+  assert.throws(() => feedbackRows(complete(), missing), /Recorded episode outcome is missing/);
 });
 test('outcomes are session-bound; sound decisions can have unlucky results', () => {
   const s = complete();
