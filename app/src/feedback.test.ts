@@ -25,7 +25,7 @@ test('decision feedback uses presentation order, all members, and the 12.5% cost
   assert.equal(rows.find(r => r.episode === 'E10')!.recommended, 'CANCEL');
   assert.equal(rows.find(r => r.episode === 'E13')!.probability, .3);
   assert.equal(rows.filter(r => r.goodDecision).length, 9);
-  assert.ok(rows.every(r => r.cost === undefined && r.matchedOutcome === undefined));
+  assert.ok(rows.every(r => r.cost !== undefined && r.matchedOutcome !== undefined));
 });
 test('outcomes are session-bound; sound decisions can have unlucky results', () => {
   const s = complete();

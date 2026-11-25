@@ -7,7 +7,7 @@ import {contextFor, xTicks} from './frame.ts';
 import type {Dataset, Episode} from '../core.ts';
 
 test('quartiles use all ten members, with min–max whiskers including extreme values', () => {
-  const episode: Episode = {id: 'test', hours: [-3, 0], windowStart: 1,
+  const episode: Episode = {id: 'test', hours: [-3, 0], windowStart: 1, observed: 0,
     members: [0, 1, 2, 3, 4, 5, 6, 7, 8, 100].map(v => [v, 10 - v])};
   assert.deepEqual(boxSummaries(episode)[0], {hour: -3, min: 0, q25: 2.25, median: 4.5, q75: 6.75, max: 100});
   assert.equal(boxSummaries(episode)[1].min, -90);
@@ -31,7 +31,7 @@ test('every real episode has one ordered summary per actual timestep', () => {
   assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E19')!).length, 9);
 });
 test('invalid member alignment rejected, rendering availability is separate from study readiness', () => {
-  const episode = {id: 'test-invalid', hours: [-3, 0], windowStart: 1,
+  const episode = {id: 'test-invalid', hours: [-3, 0], windowStart: 1, observed: 0 as const,
     members: [[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16], [2, 3], [4, 5]]};
   assert.throws(() => boxSummaries({...episode, members: episode.members.slice(1)}));
   const broken = structuredClone(episode); broken.members[0].pop();

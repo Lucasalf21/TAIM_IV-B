@@ -6,7 +6,7 @@ import type {Dataset, Session} from './core.ts';
 import {contextFor} from './chart/frame.ts';
 import {readFileSync} from 'node:fs';
 const data: Dataset = {version: 'test', threshold: 5, windowHours: 3,
-  episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0}))};
+  episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0, observed: 0 as const}))};
 const unconsented = () => createSession('P01', 'IV-3', 'simulated', 1, data, false);
 const create = () => acceptConsent(unconsented(), true);
 test('fixed 0–16 axis contains all real values and rejects clipping', () => {
@@ -18,7 +18,7 @@ test('fixed 0–16 axis contains all real values and rejects clipping', () => {
   }
   assert.equal(contextFor(real, real.episodes.find(e => e.id === 'E13')!).xMin, -45);
   assert.equal(contextFor(real, real.episodes.find(e => e.id === 'E19')!).xMin, -24);
-  assert.throws(() => contextFor(real, {id: 'bad', hours: [0], windowStart: 0, members: [[16.01]]}));
+  assert.throws(() => contextFor(real, {id: 'bad', hours: [0], windowStart: 0, observed: 0, members: [[16.01]]}));
 });
 test('consent is explicit, versioned and enforced beyond the screen', () => {
   const s = unconsented();

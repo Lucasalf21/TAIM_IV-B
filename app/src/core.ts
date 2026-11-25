@@ -3,7 +3,7 @@ export type Mode = 'simulated' | 'pilot' | 'study';
 export type Decision = 'GO' | 'CANCEL';
 import {CONSENT_VERSION} from './consent.ts';
 export type Phase = 'consent' | 'instructions' | 'trial' | 'between' | 'questionnaire' | 'complete' | 'declined' | 'withdrawn';
-export interface Episode {id: string; hours: number[]; members: number[][]; windowStart: number}
+export interface Episode {id: string; hours: number[]; members: number[][]; windowStart: number; observed: 0 | 1}
 export interface Dataset {version: string; threshold: number; windowHours: number; episodes: Episode[]}
 export const PROTOCOL = 'ivb-template-4';
 export const STORAGE_KEY = 'taim-ivb-session-v1';

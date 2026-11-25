@@ -12,7 +12,7 @@ export function feedbackRows(s: Session, data: Dataset, outcomes?: OutcomeFeedba
     if (!a?.decision || !e) throw Error('Completed trial data is missing.');
     const probability = e.members.filter(m => m.slice(e.windowStart).some(v => v > data.threshold)).length / e.members.length;
     const recommended: Decision = probability * 40000 <= 5000 ? 'GO' : 'CANCEL';
-    const observed = outcomes?.trials[i].observed;
+    const observed = outcomes?.trials[i].observed ?? e.observed;
     return {episode: id, position: i + 1, decision: a.decision, probability, recommended,
       goodDecision: a.decision === recommended, observed,
       matchedOutcome: observed === undefined ? undefined : a.decision === (observed ? 'CANCEL' : 'GO'),

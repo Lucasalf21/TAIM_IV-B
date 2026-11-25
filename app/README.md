@@ -142,29 +142,14 @@ page with decision-quality totals and a per-trial table. This is calculated from
 ensemble trajectories using the stated €5,000/€40,000 cost rule. It is not shown during
 measured trials or before the questionnaire.
 
-Recorded weather and realised costs remain researcher-only until the debrief. To show
-both kinds of feedback in a supervised session:
+Recorded weather and realised costs are shown automatically after the participant
+completes all 20 trials and the workload questionnaire. The results page derives the
+observed outcome from the final, prepared episode data and never requires a CSV export,
+scorer run, or manual file upload.
 
-1. Export the **session CSV** and **trials CSV** from the completed session.
-2. Run the scoring command below. Alongside `new-scored.csv`, it automatically creates
-   **`new-scored.debrief.json`**. For software simulations only, add `--allow-simulated`.
-3. On the completed session's **Researcher screen**, choose that file under
-   **Completed-session debrief file**. Then open **Participant screen**.
-4. The results now also show recorded-weather agreement, total realised scenario cost,
-   and each trial's recorded outcome and loss. Both feedback types are labelled
-   separately: a good decision under uncertainty can have an unlucky outcome.
-
-The JSON is validated against session ID, dataset, protocol, mode, condition, all 20
-episode IDs in presentation order, and the actual choices. Mismatched, incomplete,
-invalid or oversized files are rejected. It does not modify responses, timestamps or
-questionnaire answers. Imported outcomes are held only in memory: reload requires
-loading the file again; withdrawal, deletion or starting another session clears them.
-
-This manual step keeps recorded outcomes out of the shipped participant JavaScript.
-No outcome file is served or fetched automatically. File selection reads the local file;
-it does not upload it to a server. Treat debrief JSONs like other session-level exports
-for retention/deletion, including any copies generated for a subsequently withdrawn
-session. Do not give participants debrief files before they finish.
+The two feedback measures remain separate: a good decision under uncertainty can have
+an unlucky outcome. Withdrawal or deleting the local session removes access to the
+results. Downloaded CSV exports remain under the human-managed retention procedure.
 
 Every CSV includes session ID, participant ID, condition, mode, protocol, dataset version
 and order row. Session CSV adds exact sequence and lifecycle state. Trials CSV includes
