@@ -59,8 +59,8 @@ hr {border: 0; border-top: 1px solid var(--line); margin-block: 24px;}
 label {display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; font-weight: 500;}
 label small {font-weight: 400;}
 input, select, textarea, button {font: inherit;}
-input:not([type="radio"]):not([type="checkbox"]):not([type="file"]), select, textarea {width: 100%; color: #f0f5f5; background: #0d1516; border: 1px solid var(--control); border-radius: var(--radius-sm); padding: 10px 13px; font-weight: 400;}
-input:not([type="radio"]):not([type="checkbox"]):hover, select:hover, textarea:hover {border-color: #93a5a5;}
+input:not([type="radio"]):not([type="checkbox"]):not([type="file"]):not([type="range"]), select, textarea {width: 100%; color: #f0f5f5; background: #0d1516; border: 1px solid var(--control); border-radius: var(--radius-sm); padding: 10px 13px; font-weight: 400;}
+input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):hover, select:hover, textarea:hover {border-color: #93a5a5;}
 input[type="number"] {max-width: 200px; font-variant-numeric: tabular-nums;}
 input[type="file"] {color: var(--muted); font-size: 14px; font-weight: 400;}
 input[type="file"]::file-selector-button {font: inherit; font-weight: 600; margin-right: 12px; padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--item); background: transparent; color: var(--accent); cursor: pointer;}
@@ -165,18 +165,25 @@ fieldset {border: 0; padding: 0; margin: 0;} legend {font-size: 19px; font-weigh
 .choice b {font-size: 19px; letter-spacing: .04em;}
 .choice span {font-size: 14px; color: var(--muted); font-weight: 400;}
 .response .fields {gap: 0 24px;}
-.response .fields > label {margin-bottom: 14px;}
-.response input[type="number"] {max-width: none;}
+.response .fields > .rating-field {flex: 1; min-width: 240px; margin-bottom: 14px;}
+.rating-field {display: flex; flex-direction: column; gap: 8px;}
+.rating-label {margin: 0; font-weight: 500;}
+.rating-controls {display: flex; align-items: flex-start; gap: 14px;}
+.rating-slider-wrap {flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 4px; padding-top: 8px;}
+.rating-range {width: 100%; margin: 0; cursor: pointer; accent-color: var(--item);}
+.rating-field[data-answered="false"] .rating-range {accent-color: var(--control); opacity: .82;}
+.rating-bounds {display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;}
+.rating-number {max-width: 96px; flex-shrink: 0;}
 .submit-row {grid-column: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px;}
 .submit-row .hint {margin: 0;}
 
 /* Questionnaire */
 .tlx {display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 22px;}
-.tlx label {margin: 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); gap: 6px;}
-.tlx label:focus-within {border-color: var(--band);}
-.tlx .name {font-size: 16px; font-weight: 600;}
+.tlx .rating-field {margin: 0; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); gap: 6px;}
+.tlx .rating-field:focus-within {border-color: var(--band);}
+.tlx .rating-label {font-size: 16px; font-weight: 600;}
 .tlx small {flex: 1; margin-bottom: 6px;}
-.tlx input[type="number"] {max-width: 140px;}
+.tlx .rating-number {max-width: 96px;}
 .form-foot {display: flex; justify-content: flex-end; margin-top: 8px;}
 
 /* Results */

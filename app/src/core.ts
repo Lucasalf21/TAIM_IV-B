@@ -89,21 +89,27 @@ export function begin(s: Session): Session {
   next.phase = 'trial';
   return next;
 }
+export function parseRating(value: string, min: number, max: number, step: number): number {
+  const trimmed = value.trim();
+  if (!trimmed || !/^-?\d+$/.test(trimmed)) {
+    throw Error(`Enter a whole number from ${min} to ${max}${step > 1 ? ` in steps of ${step}` : ''}.`);
+  }
+  const number = Number(trimmed);
+  if (!Number.isInteger(number) || number < min || number > max || (number - min) % step !== 0) {
+    throw Error(`Enter a whole number from ${min} to ${max}${step > 1 ? ` in steps of ${step}` : ''}.`);
+  }
+  return number;
+}
 export function submit(s: Session, decision: string, confidence: string, probability: string, durationMs: number): Session {
   if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required.');
   if (s.phase !== 'trial' || !Number.isFinite(durationMs) || durationMs < 0) throw Error('Trial is not ready.');
-  const numeric = (value: string, min: number, max: number) => {
-    const number = Number(value);
-    if (!value.trim() || !Number.isFinite(number) || number < min || number > max) throw Error(`Enter a number from ${min} to ${max}.`);
-    return number;
-  };
   if (!['GO', 'CANCEL'].includes(decision)) throw Error('Choose GO or CANCEL.');
   const next = structuredClone(s);
   const a = next.attempts.at(-1)!;
   if (a.status !== 'active') throw Error('This response is already locked.');
   a.decision = decision as Decision;
-  a.confidence = numeric(confidence, 50, 100);
-  if (PROBABILITY_EPISODES.includes(a.episode)) a.probability = numeric(probability, 0, 100);
+  a.confidence = parseRating(confidence, 50, 100, 1);
+  if (PROBABILITY_EPISODES.includes(a.episode)) a.probability = parseRating(probability, 0, 100, 1);
   a.durationMs = Math.round(durationMs);
   a.ended = new Date().toISOString();
   a.status = 'submitted';
@@ -114,7 +120,11 @@ export function submit(s: Session, decision: string, confidence: string, probabi
 export function finish(s: Session, q: Questionnaire): Session {
   if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required.');
   if (s.phase !== 'questionnaire') throw Error('Complete the trials first.');
-  for (const key of TLX) if (!Number.isFinite(q[key]) || q[key] < 0 || q[key] > 100) throw Error('Answer every workload question from 0 to 100.');
+  for (const key of TLX) {
+    if (typeof q[key] !== 'number' || !Number.isInteger(q[key]) || q[key] < 0 || q[key] > 100 || q[key] % 5 !== 0) {
+      throw Error('Answer every workload question from 0 to 100 in steps of 5.');
+    }
+  }
   if (typeof q.comments !== 'string' || q.comments.length > 4000) throw Error('Comments must be at most 4,000 characters.');
   return {...s, questionnaire: q, phase: 'complete', completed: new Date().toISOString()};
 }
