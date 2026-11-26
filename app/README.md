@@ -34,7 +34,8 @@ Run one tab and one session at a time; do not use private browsing for data coll
    the selected renderer is ready. Setup does not expose a condition switch during trials.
 3. Hand over the laptop. Mandatory information/consent precedes instructions and 20 trials. No checkbox is preselected; declining is terminal.
 4. Each trial requires GO/CANCEL and confidence 50–100%, with no default. Five
-   episodes also require probability 0–100%, with no default. Inputs accept decimals.
+   episodes also require probability 0–100%, with no default. Use the slider or
+   enter a whole number in the adjacent field.
 5. Submission locks the response. The next trial starts only when requested.
 6. After trial 20, complete the six Raw NASA-TLX dimensions and optional comments to view the results page.
 7. Once the participant finishes viewing results, click **Done viewing results** to open the **Facilitator handoff** screen.
@@ -123,15 +124,15 @@ main-study recruitment. Rendering tests are not human-pilot evidence.
 3-hour sample spacing, one window timestep, all 20 summary rows, derived probabilities,
 and every member CSV row against the JSON. It preserves source files and writes:
 
-- `src/generated/stimuli.json`: allowlisted participant data with relative times only;
-  no supplied probabilities, truth, normative answers, or summary statistics.
+- `src/generated/stimuli.json`: participant data with relative times, member
+  trajectories, and the recorded outcome used for the end-of-session results.
+  Supplied probabilities, normative answers, and summary statistics are omitted.
 - `scripts/source-manifest.json`: source SHA-256 values and participant dataset version,
   for researcher-side scoring. Never import this manifest into the frontend.
 
-The build scans bundled JavaScript for supplied scoring fields. The data needed for a
-visualization still permits a technically knowledgeable person to derive ensemble
-probabilities: this is a supervised experiment, not a security boundary against
-developer tools. Recorded truth stays outside the served production directory.
+The build scans bundled JavaScript for selected scoring field names. The bundled data
+allows someone with developer tools to derive ensemble probabilities and inspect the
+recorded outcomes before the UI displays them. Run participant sessions supervised.
 
 Serve **only `app/dist`** for participant use, not the repository root. Vite development
 mode is for implementation, not collecting study data.
@@ -140,19 +141,10 @@ mode is for implementation, not collecting study data.
 
 ### End-of-session feedback
 
-After all 20 trials **and** the workload questionnaire, the participant sees a results
-page with decision-quality totals and a per-trial table. This is calculated from the
-ensemble trajectories using the stated €5,000/€40,000 cost rule. It is not shown during
-measured trials or before the questionnaire.
-
-Recorded weather and realised costs are shown automatically after the participant
-completes all 20 trials and the workload questionnaire. The results page derives the
-observed outcome from the final, prepared episode data and never requires a CSV export,
-scorer run, or manual file upload.
-
-The two feedback measures remain separate: a good decision under uncertainty can have
-an unlucky outcome. Withdrawal or deleting the local session removes access to the
-results. Downloaded CSV exports remain under the human-managed retention procedure.
+After all 20 trials and the workload questionnaire, the participant sees their total
+scenario cost and a per-trial table with their choice, recorded wind, and scenario
+cost. The page uses the prepared episode data directly. The offline scorer still
+calculates expected-cost agreement and agreement with recorded weather separately.
 
 Every CSV includes session ID, participant ID, condition, mode, protocol, dataset version
 and order row. Session CSV adds exact sequence and lifecycle state. Trials CSV includes
@@ -213,7 +205,7 @@ production build, and the participant-bundle guard. TypeScript explicitly resolv
 Plot's shipped declarations because Plot 0.6.18's exports omit the types entry.
 See `VERIFICATION.md` for the actual browser walkthrough and remaining readiness gates.
 
-## Consent, withdrawal and deletion (protocol 2)
+## Consent, withdrawal and deletion
 
 Editable participant wording lives in **`src/consent.ts`**. This is a draft for the
 two teams to review before recruitment. It describes the purpose, approximately
@@ -233,24 +225,17 @@ and actual follow-up contact route. Change the consent version whenever wording 
 and update the scorer's accepted version and tests to match. Record that frozen wording
 with the study materials. This app is not an institutional ethics approval or legal review.
 
-The header keeps **Leave experiment** available throughout participant screens, including
-the questionnaire and completion page. Leaving is immediate; it does not require filling
-inputs, answering a reason, or clicking a confirmation. It discards attempts/questionnaire
-and marks the session `withdrawn` (or `declined` before consent). Only setup/consent/exit
-metadata remains. That exit record cannot resume into trials. All CSVs include session
-phase, consent version/time and withdrawal time; withdrawn trial/questionnaire CSVs are
-header-only. Timers stop immediately. If saving the exit record fails, the app tries to
-delete the local session; if both operations fail it clearly requests researcher cleanup.
-
-**Delete local session** is available after leaving/completing and on the researcher
-screen (also for damaged/legacy saves). Its confirmation shows the target session codes
+Participants can decline on the consent screen or ask the facilitator to stop at any
+time. Closing the tab leaves a recoverable local copy. To discard it, the facilitator
+returns to **Session setup** by reloading or reopening the app and chooses **Delete
+local session**. This works for damaged or legacy saves as well. The confirmation shows the target session codes
 where available and explains the boundary. It removes only the experiment's storage key
 and in-memory session; it does not clear unrelated site/browser data or source weather
 files. Keep session codes before deleting if downloaded copies need removal.
 
 For a withdrawal/deletion request, the researcher must:
 
-1. Re-export the latest exit/session record if an audit record is needed, before local deletion.
+1. Record the session code before local deletion if copies have already been downloaded.
 2. Locate copies by participant/session ID across **both teams**: session/trial/questionnaire
    CSVs, JSON backups, scored CSVs and shared/backup storage. Remove the requested
    response data and exclude it from any pending analysis. Do not retain an old complete
