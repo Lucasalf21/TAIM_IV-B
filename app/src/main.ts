@@ -132,31 +132,24 @@ function setup() {
 function results() {
   const s = session!;
   const rows = feedbackRows(s, data);
-  const totalDurationMs = s.attempts
-    .filter(a => a.status === 'submitted')
-    .reduce((sum, a) => sum + (a.durationMs ?? 0), 0);
-  const totalSec = Math.round(totalDurationMs / 1000);
-  const totalDurationStr = totalSec >= 60
-    ? `${Math.floor(totalSec / 60)}m ${totalSec % 60}s`
-    : `${totalSec}s`;
   const money = (v: number) => new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
-  const badge = (ok: boolean, yes: string, no: string) => `<span class="badge ${ok ? 'good' : 'bad'}"><span aria-hidden="true">${ok ? '✓' : '✕'}</span>${ok ? yes : no}</span>`;
-  shell(`<section class="page-head"><p class="eyebrow">Session complete</p><h1 tabindex="-1">Your decisions, explained.</h1>
-    <p class="lead">All trials and your workload questionnaire are finished. Total time elapsed: <strong>${totalDurationStr}</strong>. This feedback does not change your saved answers.</p></section>
-    <div class="result-groups"><section class="card result-group" aria-labelledby="quality-title"><p class="eyebrow">Measure 1</p><h2 id="quality-title">Decision quality</h2>
-      <div class="stat-row"><p class="stat"><strong>${rows.filter(r => r.goodDecision).length} / 20</strong><span>Choices that minimise expected cost</span></p><p class="stat"><strong>${totalDurationStr}</strong><span>Total time elapsed</span></p></div>
-      <p><strong>Decision quality</strong> uses the ensemble probability and the stated costs: GO has expected cost probability × €40,000, whereas CANCEL costs €5,000. GO minimises expected cost below 12.5%; CANCEL above it. This assumes minimising average monetary cost.</p></section>
-    <section class="card result-group" aria-labelledby="outcome-title"><p class="eyebrow">Measure 2</p><h2 id="outcome-title">Outcome agreement</h2>
-      <div class="stat-row"><p class="stat"><strong>${rows.filter(r => r.matchedOutcome).length} / 20</strong><span>Choices matching recorded weather outcomes</span></p><p class="stat"><strong>${money(rows.reduce((sum, r) => sum + r.cost!, 0))}</strong><span>Total realised scenario cost</span></p></div>
-      <p><strong>Outcome agreement</strong> compares your choice with the recorded weather: GO when wind stayed at or below the limit; CANCEL when it went above. A sensible decision can have an unlucky outcome. Cancelling still costs €5,000 even if the weather turns out safe. The scenario costs are fictional.</p>
-      <p class="simulation-note">Recorded outcomes are disclosed only after the questionnaire.</p></section></div>
-    <div class="results-table" role="region" aria-label="Per-trial results" tabindex="0"><table><caption>Your 20 measured decisions, in presentation order</caption>
-    <colgroup span="2"></colgroup><colgroup span="3"></colgroup><colgroup span="3"></colgroup>
-    <thead><tr><td colspan="2"></td><th scope="colgroup" colspan="3" class="group-start">Decision quality</th><th scope="colgroup" colspan="3" class="group-start">Outcome agreement</th></tr>
-    <tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col" class="group-start">Ensemble chance above limit</th><th scope="col">Cost-minimising choice</th><th scope="col">Decision quality</th><th scope="col" class="group-start">Recorded wind</th><th scope="col">Outcome agreement</th><th scope="col">Scenario cost</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
+  const totalCost = rows.reduce((sum, r) => sum + r.cost, 0);
+  shell(`<section class="page-head"><p class="eyebrow">Session complete</p><h1 tabindex="-1">Your results</h1>
+    <p class="lead">All 20 measured trials and your workload questionnaire are finished. This summary does not change your saved answers.</p></section>
+    <section class="card result-summary" aria-labelledby="cost-title"><h2 id="cost-title">Total scenario cost</h2>
+      <div class="stat-row"><p class="stat"><strong>${money(totalCost)}</strong><span>Across 20 measured trials</span></p></div>
+      <p>Each trial’s scenario cost depends on your choice and the recorded wind during the 3-hour transfer window (limit: 5 m/s at 100 m):</p>
+      <ul class="cost-rules">
+        <li><strong>€0</strong> — <strong>GO</strong> when recorded wind stayed at or below the 5 m/s limit.</li>
+        <li><strong>€5,000</strong> — <strong>CANCEL</strong> (whether or not wind later went above the limit).</li>
+        <li><strong>€40,000</strong> — <strong>GO</strong> when recorded wind was above the 5 m/s limit.</li>
+      </ul>
+      <p class="simulation-note">Scenario costs are fictional. Recorded outcomes are disclosed only after the questionnaire.</p></section>
+    <div class="results-table" role="region" aria-label="Per-trial results" tabindex="0"><table><caption>Your 20 measured trials, in presentation order</caption>
+    <thead><tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col">Recorded wind</th><th scope="col">Scenario cost</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td>${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
-    <p>Keep these codes to request deletion of downloaded copies.</p></section>`, 'Results');
+    <p>Keep these codes. Contact the facilitator if you want downloaded copies of your data deleted.</p></section>`, 'Results');
 }
 function handoff() {
   const s = session!;
