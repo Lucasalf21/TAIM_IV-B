@@ -40,10 +40,10 @@ export function latinSquare(ids: string[], row: number): string[] {
   return Array.from({length: n}, (_, i) => ids[((i % 2 ? n - (i + 1) / 2 : i / 2) + row - 1) % n]);
 }
 export function createSession(participant: string, condition: Condition, mode: Mode, orderRow: number,
-  data: Dataset, ready: boolean): Session {
+  data: Dataset, readyForStudy: boolean): Session {
   if (!/^[A-Za-z0-9_-]{1,32}$/.test(participant)) throw Error('Use an anonymous ID: 1–32 letters, numbers, underscores or hyphens.');
   if (!['IV-3', 'IV-4'].includes(condition) || !['simulated', 'pilot', 'study'].includes(mode)) throw Error('Invalid session setup.');
-  if (mode !== 'simulated' && !ready) throw Error('Real sessions are blocked: the assigned chart renderer is not ready.');
+  if (mode === 'study' && !readyForStudy) throw Error('Real study sessions remain blocked pending pilot review.');
   return {schema: 1, protocol: PROTOCOL, dataset: data.version, id: crypto.randomUUID(), participant,
     condition, mode, orderRow, sequence: latinSquare(data.episodes.map(e => e.id), orderRow),
     created: new Date().toISOString(), phase: 'consent', cursor: 0, attempts: []};

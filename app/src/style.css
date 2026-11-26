@@ -16,10 +16,8 @@ body {margin: 0; min-height: 100vh; display: flex; flex-direction: column;}
 /* Header, simulation strip and footer */
 .topbar {position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);}
 .topbar-inner {display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 64px; padding-block: 10px;}
-.brand {display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--muted); letter-spacing: .01em;}
+.brand {font-size: 15px; color: var(--muted); letter-spacing: .01em;}
 .brand strong {color: var(--text); font-weight: 600;}
-.brand-mark {width: 10px; height: 22px; border-radius: 2px; background: linear-gradient(var(--item) 0 0) center / 2px 100% no-repeat; position: relative;}
-.brand-mark::after {content: ""; position: absolute; inset: 5px 0; border: 1.5px solid var(--item); border-radius: 2px; background: var(--band);}
 nav {display: flex; flex-wrap: wrap; gap: 10px;}
 .simulation {margin: 0; max-width: none; display: flex; justify-content: center; align-items: center; gap: 12px; padding: 7px 24px; background: var(--deep); color: var(--accent); font-size: 14px; border-top: 1px solid var(--band);}
 .tag {display: inline-block; padding: 1px 8px; border: 1px solid var(--accent); border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;}

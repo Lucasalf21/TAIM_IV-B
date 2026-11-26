@@ -68,8 +68,15 @@ test('balanced Latin square covers all positions and directed adjacent pairs', (
   assert.equal(new Set(pairs).size, 20 * 19);
   assert.throws(() => latinSquare(ids, 0));
 });
-test('real modes blocked; anonymous ID validated', () => {
-  for (const mode of ['pilot', 'study'] as const) assert.throws(() => createSession('P01', 'IV-3', mode, 1, data, false));
+test('pilot mode is available while study mode requires readiness', () => {
+  for (const condition of ['IV-3', 'IV-4'] as const) {
+    const pilot = createSession('P01', condition, 'pilot', 1, data, false);
+    assert.equal(pilot.phase, 'consent');
+    assert.equal(recover(JSON.stringify(pilot), data).mode, 'pilot');
+    assert.match(exportsFor(pilot).session, /"pilot"/);
+    assert.throws(() => createSession('P01', condition, 'study', 1, data, false), /Real study sessions remain blocked/);
+  }
+  assert.equal(createSession('P01', 'IV-3', 'study', 1, data, true).mode, 'study');
   assert.throws(() => createSession('person@example.com', 'IV-3', 'simulated', 1, data, false));
 });
 test('all measured trials, scheduled questions and TLX export correctly', () => {

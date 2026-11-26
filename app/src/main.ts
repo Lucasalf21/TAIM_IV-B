@@ -53,7 +53,7 @@ function download(name: string, text: string, type = 'text/csv;charset=utf-8') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function shell(content: string, title: string) {
-  root.innerHTML = `<header class="topbar"><div class="wrap topbar-inner"><span class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>TAIM</strong> / Wind transfer experiment</span></span></div>
+  root.innerHTML = `<header class="topbar"><div class="wrap topbar-inner"><span class="brand"><strong>TAIM</strong> / Wind transfer experiment</span></div>
     ${session?.mode === 'simulated' ? '<div class="simulation" role="note"><span class="tag">Simulation</span><span>Simulated session · not participant evidence</span></div>' : ''}</header>
     <main class="wrap"><div id="error" role="alert" tabindex="-1"></div>${content}</main>
     <footer><div class="wrap">TAIM 2026–27 · IV-B <span>Generated using Copernicus Climate Change Service information 2026. Neither the European Commission nor ECMWF is responsible for any use that may be made of the Copernicus information or data it contains.</span></div></footer>
@@ -101,10 +101,10 @@ function setup() {
       <label>Anonymous participant ID<input name="participant" required pattern="(?:[A-Za-z0-9_]|-){1,32}" maxlength="32" placeholder="For example, P01" autocomplete="off"></label>
       <div class="fields"><label>Condition<select name="condition"><option>IV-3</option><option>IV-4</option></select></label>
       <label>Order row<input name="row" type="number" min="1" max="20" step="1" value="1" required></label></div>
-      <label>Session mode<select name="mode"><option value="simulated">Simulated walkthrough</option><option value="pilot">Real pilot (blocked)</option><option value="study">Real study (blocked)</option></select></label>
-      <p class="hint">IV-3 draws box plots and IV-4 draws unconnected member dots from the supplied data. Real sessions remain blocked pending pilot review. Use matching order rows across conditions.</p>
+      <label>Session mode<select name="mode"><option value="simulated">Simulated walkthrough</option><option value="pilot">Real pilot</option><option value="study">Real study (blocked)</option></select></label>
+      <p class="hint">IV-3 draws box plots and IV-4 draws unconnected member dots from the supplied data. Use matching order rows across conditions.</p>
       <label class="check"><input name="replace" type="checkbox" ${saved || session ? 'required' : ''}> I have exported any previous session before replacing it.</label>
-      <div class="actions"><button type="submit">Start simulated session</button></div>
+      <div class="actions"><button type="submit">Start session</button></div>
     </form></section>
     <div class="stack"><section class="card" aria-labelledby="saved-title"><div class="card-head"><h2 id="saved-title">Saved work</h2><span class="status${saved || session ? ' on' : ''}">${saved || session ? 'Stored locally' : 'Empty'}</span></div><p id="saved-status">${status}</p>
       <div class="actions"><button class="secondary" id="recover" ${saved ? '' : 'disabled'}>Recover saved session</button><button class="secondary" id="backup" ${saved || session ? '' : 'disabled'}>Export JSON backup</button><button class="danger" id="delete-local" ${saved || session ? '' : 'disabled'}>Delete local session</button></div></section>
@@ -122,7 +122,7 @@ function setup() {
   $('#recover').onclick = () => {
     action(() => {
       const next = recover(saved!, data);
-      if (next.mode !== 'simulated' && !renderers[next.condition].readyForStudy) throw Error('This real session cannot resume until its renderer is ready. Export its backup.');
+      if (next.mode === 'study' && !renderers[next.condition].readyForStudy) throw Error('This real study session cannot resume until the pilot review is complete. Export its backup.');
       return next;
     }, true);
   };
@@ -146,8 +146,8 @@ function results() {
       </ul>
       <p class="simulation-note">Scenario costs are fictional. Recorded outcomes are disclosed only after the questionnaire.</p></section>
     <div class="results-table" role="region" aria-label="Per-trial results" tabindex="0"><table><caption>Your 20 measured trials, in presentation order</caption>
-    <thead><tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col">Recorded wind</th><th scope="col">Scenario cost</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td>${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
+    <thead><tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col">Recorded wind</th><th scope="col">Verdict</th><th scope="col">Scenario cost</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td>${r.observed ? 'Above limit' : 'At/below limit'}</td><td><span class="status${r.matchedOutcome ? ' on' : ''}">${r.matchedOutcome ? 'Matched' : 'Didn’t match'}</span></td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
     <p>Keep these codes. Contact the facilitator if you want downloaded copies of your data deleted.</p></section>`, 'Results');
 }

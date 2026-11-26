@@ -1,8 +1,8 @@
 # IV-B shared experiment template
 
 English-only, supervised browser experiment shared by IV-3 (box-plot series) and IV-4
-(unconnected dot series). Both IV-3 and IV-4 render real charts in this shared app. Both renderers have `readyForStudy: false`. Only **simulated** sessions
-can run. A simulated session is software verification, not a human pilot or study.
+(unconnected dot series). Both encodings are available for **Simulated walkthrough**
+and **Real pilot**. **Real study** remains gated by each renderer's `readyForStudy` flag.
 
 ## Run locally
 
@@ -30,8 +30,8 @@ Run one tab and one session at a time; do not use private browsing for data coll
 ## Researcher procedure
 
 1. Enter an anonymous ID (e.g. `P01`), condition and order row. Do not enter names.
-2. Select **Simulated walkthrough**. Real pilot/study modes intentionally fail until
-   the selected renderer is ready. Setup does not expose a condition switch during trials.
+2. Select **Real pilot** for supervised pilot sessions or **Simulated walkthrough**
+   for software verification. Setup does not expose a condition switch during trials.
 3. Hand over the laptop. Mandatory information/consent precedes instructions and 20 trials. No checkbox is preselected; declining is terminal.
 4. Each trial requires GO/CANCEL and confidence 50–100%, with no default. Five
    episodes also require probability 0–100%, with no default. Use the slider or
@@ -109,14 +109,13 @@ legend explain the encoding. The transfer-time box is at 0 h; the 0–3 h shadin
 indicates duration, not extra interpolated samples.
 
 Implemented encodings render in simulated mode too. `implemented` controls actual
-chart availability; `readyForStudy` remains false until the real-session readiness
+chart availability; `readyForStudy` remains false until the main-study readiness
 review. Select IV-3 or IV-4 + Simulated walkthrough to inspect all 20 actual episodes. Simulation exports remain marked and rejected by the scorer by default.
 IV-4 renders ten unconnected ensemble-member dots at each timestep in the shared app.
 
-Before collecting human data, review the implementation and agreed protocol with IV-4,
-arrange the two-person pilot, then enable the appropriate real-session readiness flag
-for that approved stage. Correct any pilot issues and freeze the study build before
-main-study recruitment. Rendering tests are not human-pilot evidence.
+Review the implementation and agreed protocol with IV-4 for the two-person pilot.
+Correct any pilot issues and freeze the study build before enabling **Real study**
+and starting main-study recruitment.
 
 ## Data boundary and provenance
 
