@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, latinSquare, PROBABILITY_EPISODES,
+import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, latinSquare, markResultsViewed, PROBABILITY_EPISODES,
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import type {Dataset, Session} from './core.ts';
 import {contextFor, practiceEpisode} from './chart/frame.ts';
@@ -187,4 +187,39 @@ test('recovery keeps compatibility for valid old consent without misrepresenting
   s = finish(s, {...Object.fromEntries(TLX.map(k => [k, 20])), comments: ''} as Parameters<typeof finish>[1]);
   assert.equal(recover(JSON.stringify(s), data).consent?.version, 'ivb-consent-2026-11-23');
   assert.throws(() => recover(JSON.stringify({...oldSave, consent: {version: 'ivb-consent-unknown', accepted: '2026-11-23T12:00:00.000Z'}}), data));
+});
+test('resultsViewed gate requires complete state, preserves CSV phase, and recovers handoff', () => {
+  let s = create();
+  assert.throws(() => markResultsViewed(s));
+  for (let i = 0; i < 20; i++) {
+    s = begin(s);
+    s = submit(s, 'GO', '75', '20', 100);
+  }
+  s = begin(s);
+  assert.throws(() => markResultsViewed(s));
+  const q = {...Object.fromEntries(TLX.map(k => [k, 25])), comments: ''};
+  const completed = finish(s, q as Parameters<typeof finish>[1]);
+  assert.equal(completed.resultsViewed, undefined);
+  assert.equal(recover(JSON.stringify(completed), data).resultsViewed, undefined);
+
+  const handoffReady = markResultsViewed(completed);
+  assert.equal(handoffReady.phase, 'complete');
+  assert.equal(handoffReady.resultsViewed, true);
+  assert.equal(markResultsViewed(handoffReady), handoffReady);
+
+  const recoveredHandoff = recover(JSON.stringify(handoffReady), data);
+  assert.equal(recoveredHandoff.phase, 'complete');
+  assert.equal(recoveredHandoff.resultsViewed, true);
+
+  const exported = exportsFor(handoffReady);
+  assert.match(exported.session, /,"complete",/);
+  assert.match(exported.trials, /,"complete",/);
+  assert.match(exported.questionnaire, /,"complete",/);
+
+  assert.throws(() => recover(JSON.stringify({...completed, resultsViewed: false}), data));
+  assert.throws(() => recover(JSON.stringify({...completed, resultsViewed: 'yes'}), data));
+  assert.throws(() => recover(JSON.stringify({...s, resultsViewed: true}), data));
+  const withdrawn = withdraw(handoffReady);
+  assert.equal(withdrawn.resultsViewed, undefined);
+  assert.throws(() => markResultsViewed(withdrawn));
 });

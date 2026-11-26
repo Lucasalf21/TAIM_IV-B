@@ -1,6 +1,6 @@
 import './style.css';
 import source from './generated/stimuli.json';
-import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, parseRating, PROBABILITY_EPISODES,
+import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, markResultsViewed, parseRating, PROBABILITY_EPISODES,
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import {CONSENT_HTML, CONSENT_VERSION} from './consent.ts';
 import type {Condition, Dataset, Demographics, Mode, Questionnaire, Session} from './core.ts';
@@ -108,7 +108,6 @@ function setup() {
     </form></section>
     <div class="stack"><section class="card" aria-labelledby="saved-title"><div class="card-head"><h2 id="saved-title">Saved work</h2><span class="status${saved || session ? ' on' : ''}">${saved || session ? 'Stored locally' : 'Empty'}</span></div><p id="saved-status">${status}</p>
       <div class="actions"><button class="secondary" id="recover" ${saved ? '' : 'disabled'}>Recover saved session</button><button class="secondary" id="backup" ${saved || session ? '' : 'disabled'}>Export JSON backup</button><button class="danger" id="delete-local" ${saved || session ? '' : 'disabled'}>Delete local session</button></div></section>
-      ${session ? '<section class="card" aria-labelledby="exports-title"><h2 id="exports-title">Researcher exports</h2><p class="hint">Export all three files separately. Practice and interrupted attempts remain marked. Back up files after every session.</p><div class="actions"><button class="secondary" data-export="session">Session CSV</button><button class="secondary" data-export="trials">Trials CSV</button><button class="secondary" data-export="questionnaire">Questionnaire CSV</button></div></section>' : ''}
       <section class="card" aria-labelledby="settings-title"><h2 id="settings-title">Study settings</h2><dl class="settings"><dt>Trials</dt><dd>20 episodes</dd><dt>Transfer window</dt><dd>3 hours</dd><dt>Wind limit</dt><dd>5 m/s at 100 m</dd><dt>Costs</dt><dd>€5,000 cancel / €40,000 abort</dd></dl></section>
     </div></div>`, 'Researcher setup');
   $('#setup').onsubmit = event => {
@@ -129,7 +128,6 @@ function setup() {
   };
   $('#backup').onclick = () => download(`taim-backup-${session?.id ?? 'saved'}.json`, session ? JSON.stringify(session, null, 2) : saved!, 'application/json');
   $('#delete-local').onclick = requestDelete;
-  wireExports();
 }
 function results() {
   const s = session!;
@@ -158,7 +156,30 @@ function results() {
     <tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col" class="group-start">Ensemble chance above limit</th><th scope="col">Cost-minimising choice</th><th scope="col">Decision quality</th><th scope="col" class="group-start">Recorded wind</th><th scope="col">Outcome agreement</th><th scope="col">Scenario cost</th></tr></thead>
     <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
-    <p>Keep these codes to request deletion of downloaded copies.</p></section>`, 'Results');
+    <p>Keep these codes to request deletion of downloaded copies.</p></section>
+    <div class="actions"><button id="done-results">Done viewing results</button></div>`, 'Results');
+  $('#done-results').onclick = () => action(() => markResultsViewed(session!));
+}
+function handoff() {
+  const s = session!;
+  shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Facilitator handoff</p><h1 tabindex="-1">Session complete — export and handoff</h1>
+    <p class="lead">Participant <strong>${escape(s.participant)}</strong> has finished viewing results. This screen is for the supervising facilitator only.</p></div>
+    <div class="stack">
+      <section class="card" aria-labelledby="exports-title"><h2 id="exports-title">Researcher exports</h2>
+        <p class="hint">Export all three CSV files separately, then verify in your downloads folder that all three files exist and are non-empty before replacing this session.</p>
+        <p class="callout"><strong>Verify all three downloaded CSVs before starting the next session.</strong> This completed session remains stored in browser storage until the next session is saved.</p>
+        <div class="actions"><button class="secondary" data-export="session">Session CSV</button><button class="secondary" data-export="trials">Trials CSV</button><button class="secondary" data-export="questionnaire">Questionnaire CSV</button></div>
+      </section>
+      <section class="card" aria-labelledby="handoff-codes-title"><h2 id="handoff-codes-title">Completed session</h2>
+        <dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd><dt>Condition</dt><dd>${escape(s.condition)}</dd><dt>Mode</dt><dd>${escape(s.mode)}</dd></dl>
+        <div class="actions"><button id="start-next">Start next session</button></div>
+      </section>
+    </div></section>`, 'Facilitator handoff');
+  wireExports();
+  $('#start-next').onclick = () => {
+    researcher = true;
+    render();
+  };
 }
 function consent() {
   shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Participant information and consent</p><h1 tabindex="-1">Your choice to take part.</h1></div><div class="prose">${CONSENT_HTML}</div>
@@ -400,7 +421,9 @@ function render() {
     }
     case 'questionnaire': questionnaire(); break;
     case 'complete':
-      results(); break;
+      if (session.resultsViewed) handoff();
+      else results();
+      break;
     case 'declined':
     case 'withdrawn':
       shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Participation ended</p><h1 tabindex="-1">${session.phase === 'declined' ? 'You chose not to take part.' : 'You have left the experiment.'}</h1><p class="lead">No more answers are required.</p></div><p>Your recorded responses and questionnaire have been discarded from this session; only its consent/exit record remains if saving succeeded. This session cannot resume.</p>

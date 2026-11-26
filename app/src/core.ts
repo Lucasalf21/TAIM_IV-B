@@ -29,7 +29,7 @@ export interface Session {
   condition: Condition; mode: Mode; orderRow: number; sequence: string[];
   created: string; phase: Phase; cursor: number; attempts: Attempt[];
   demographics?: Demographics;
-  questionnaire?: Questionnaire; completed?: string;
+  questionnaire?: Questionnaire; completed?: string; resultsViewed?: true;
   consent?: {version: string; accepted: string};
   withdrawn?: string;
 }
@@ -65,7 +65,7 @@ export function submitDemographics(s: Session, demographics: Demographics): Sess
 export function withdraw(s: Session): Session {
   if (['declined', 'withdrawn'].includes(s.phase)) return s;
   return {...s, phase: s.consent ? 'withdrawn' : 'declined', withdrawn: new Date().toISOString(),
-    cursor: 0, attempts: [], questionnaire: undefined, completed: undefined};
+    cursor: 0, attempts: [], questionnaire: undefined, completed: undefined, resultsViewed: undefined};
 }
 export function deleteLocal(storage: Pick<Storage, 'removeItem' | 'getItem'>) {
   try {
@@ -129,6 +129,12 @@ export function finish(s: Session, q: Questionnaire): Session {
   if (typeof q.comments !== 'string' || q.comments.length > 4000) throw Error('Comments must be at most 4,000 characters.');
   return {...s, questionnaire: q, phase: 'complete', completed: new Date().toISOString()};
 }
+export function markResultsViewed(s: Session): Session {
+  if (!hasAcceptedConsent(s)) throw Error('Consent is required.');
+  if (s.phase !== 'complete') throw Error('Complete the session before opening facilitator handoff.');
+  if (s.resultsViewed) return s;
+  return {...s, resultsViewed: true};
+}
 export function recover(text: string, data: Dataset): Session {
   const s = JSON.parse(text) as Session;
   const date = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v));
@@ -175,6 +181,12 @@ export function recover(text: string, data: Dataset): Session {
     (s.phase === 'between' && s.cursor < 1) ||
     (['questionnaire', 'complete'].includes(s.phase) && s.cursor !== 20) ||
     (s.phase === 'trial' && s.cursor === 20)) throw Error('Saved trial history is inconsistent.');
+  if (s.resultsViewed !== undefined && s.resultsViewed !== true) {
+    throw Error('Saved completion state is incompatible or damaged.');
+  }
+  if (s.resultsViewed && s.phase !== 'complete') {
+    throw Error('Saved completion state is inconsistent.');
+  }
   if (s.phase === 'complete') {
     if (!date(s.completed) || !s.questionnaire) throw Error('Saved questionnaire is damaged.');
     finish({...s, phase: 'questionnaire'}, s.questionnaire);

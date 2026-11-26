@@ -36,21 +36,23 @@ Run one tab and one session at a time; do not use private browsing for data coll
 4. Each trial requires GO/CANCEL and confidence 50–100%, with no default. Five
    episodes also require probability 0–100%, with no default. Inputs accept decimals.
 5. Submission locks the response. The next trial starts only when requested.
-6. After trial 20, complete the six Raw NASA-TLX dimensions and optional comments.
-7. Return to **Researcher screen** and download **all three CSVs separately**.
-   Preserve the JSON backup as well. Confirm downloaded files before replacing a session.
+6. After trial 20, complete the six Raw NASA-TLX dimensions and optional comments to view the results page.
+7. Once the participant finishes viewing results, click **Done viewing results** to open the **Facilitator handoff** screen.
+8. Download **all three CSVs separately** (`Session CSV`, `Trials CSV`, `Questionnaire CSV`) and verify the downloaded files before clicking **Start next session**.
 
-The researcher screen is a supervised control, not authenticated access. Opening it
-mid-trial marks that attempt interrupted; resuming replays the trial as a flagged
-repeated exposure. Participants must not operate researcher controls. This app stores
-only the current session; replacing it overwrites that browser copy after an explicit
-acknowledgement. Export files to your research storage after every session.
+The setup screen is a supervised control, not authenticated access. Participants must not
+operate setup or handoff controls. This app stores only the current session; clicking
+**Start next session** returns to **Session setup** while keeping the completed session in
+browser storage until the new session is saved (requiring explicit replacement
+acknowledgement). If you back out of next-session setup, **Recover saved session** returns
+to the facilitator handoff. Export files to your research storage after every session.
 
 On refresh/restart, select **Recover saved session**. Completed responses remain locked.
 An active trial becomes interrupted; a retry gets a new attempt number and
 `repeated_exposure=true`. Unsaved input is not restored. Failed storage writes block
-progression. Open the researcher screen to export partial CSVs/JSON before recovery.
-If saved JSON is damaged, export its raw backup; do not overwrite it without review.
+progression. Recovering a completed session returns to results before **Done viewing results**,
+or directly to the facilitator handoff afterward. If saved JSON is damaged, export its
+raw backup from **Session setup**; do not overwrite it without review.
 
 ## Protocol fixed by this template
 
