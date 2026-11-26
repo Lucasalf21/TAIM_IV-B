@@ -156,9 +156,7 @@ function results() {
     <tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col" class="group-start">Ensemble chance above limit</th><th scope="col">Cost-minimising choice</th><th scope="col">Decision quality</th><th scope="col" class="group-start">Recorded wind</th><th scope="col">Outcome agreement</th><th scope="col">Scenario cost</th></tr></thead>
     <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
-    <p>Keep these codes to request deletion of downloaded copies.</p></section>
-    <div class="actions"><button id="done-results">Done viewing results</button></div>`, 'Results');
-  $('#done-results').onclick = () => action(() => markResultsViewed(session!));
+    <p>Keep these codes to request deletion of downloaded copies.</p></section>`, 'Results');
 }
 function handoff() {
   const s = session!;
@@ -422,7 +420,14 @@ function render() {
     case 'questionnaire': questionnaire(); break;
     case 'complete':
       if (session.resultsViewed) handoff();
-      else results();
+      else {
+        results();
+        const done = document.createElement('div');
+        done.className = 'actions';
+        done.innerHTML = '<button id="done-results">Done viewing results</button>';
+        done.querySelector<HTMLButtonElement>('#done-results')!.onclick = () => action(() => markResultsViewed(session!));
+        root.querySelector('main')?.append(done);
+      }
       break;
     case 'declined':
     case 'withdrawn':
