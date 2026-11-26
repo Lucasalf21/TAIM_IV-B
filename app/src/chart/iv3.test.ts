@@ -27,10 +27,16 @@ test('every real episode has one ordered summary per actual timestep', () => {
     assert.equal(boxes[episode.windowStart].hour, 0);
     assert.equal(iv3.marks(contextFor(data, episode)).length, 5);
   }
-  assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E13')!).length, 16);
-  assert.equal(boxSummaries(data.episodes.find(e => e.id === 'E19')!).length, 9);
-  assert.deepEqual(xDomainFor(data.episodes.find(e => e.id === 'E13')!), [-45, 3]);
-  assert.deepEqual(xDomainFor(data.episodes.find(e => e.id === 'E19')!), [-24, 3]);
+  const e13 = data.episodes.find(e => e.id === 'E13')!;
+  const e19 = data.episodes.find(e => e.id === 'E19')!;
+  assert.equal(boxSummaries(e13).length, 16);
+  assert.equal(boxSummaries(e13)[0].hour, -45);
+  assert.equal(boxSummaries(e19).length, 9);
+  assert.equal(boxSummaries(e19)[0].hour, -24);
+  assert.equal(dotSeries(e13).length, 160);
+  assert.equal(dotSeries(e19).length, 90);
+  assert.deepEqual(xDomainFor(e13), [-48, 3]);
+  assert.deepEqual(xDomainFor(e19), [-48, 3]);
 });
 test('invalid member alignment rejected, rendering availability is separate from study readiness', () => {
   const episode = {id: 'test-invalid', hours: [-3, 0], windowStart: 1, observed: 0 as const,
@@ -44,8 +50,7 @@ test('invalid member alignment rejected, rendering availability is separate from
   assert.equal(iv3.readyForStudy, false);
   assert.equal(iv4.implemented, true);
   assert.equal(iv4.readyForStudy, false);
-  assert.deepEqual(xTicks(-45), [-45, -36, -27, -18, -9, 0, 3]);
-  assert.deepEqual(xTicks(-24), [-24, -18, -12, -6, 0, 3]);
+  assert.deepEqual(xTicks(), [-48, -36, -24, -12, 0, 3]);
   const dots = dotSeries(episode);
   assert.equal(dots.length, episode.members.length * episode.hours.length);
   assert.deepEqual(dots.filter(d => d.member === 1).map(d => d.hour), [-1.5, 1.5]);

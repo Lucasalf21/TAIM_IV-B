@@ -85,7 +85,7 @@ Entry points:
 - `src/chart/frame.ts`: shared Observable Plot frame, palette, and episode context.
   and renderer interface. Each renderer returns Plot marks from its `ChartContext`.
 
-Retain shared dimensions (900×440), episode-specific x domain (from the first available hour to +3 hours), common y domain
+Retain shared dimensions (900×440), fixed shared x domain (-48 to +3 hours), common y domain
 (0–16 with integer ticks), 5 m/s
 line, and 3-hour window. Palette tokens are transcribed from the supplied class slide;
 confirm them with the partner group before a human pilot. Do not add zoom, tooltips,
@@ -100,9 +100,8 @@ IV-3 draws one box for each actual timestep, using all ten member values. Quarti
 use linear interpolation (R-7, matching NumPy's default percentile convention); whiskers
 reach the true minimum and maximum, with no outlier dots. Boxes use the class teal
 palette and a light median line. Marks are clipped to the shared frame; missing lead-up
-is not filled. Each chart's x domain starts at that episode's first available hour and
-ends at +3 h; tick spacing adapts to the available lead-up. The boundary box at the
-first available hour is clipped at the left axis boundary. The instructions and chart
+is not filled. Each chart uses the fixed shared x domain (-48 to +3 h) and identical
+ticks (-48, -36, -24, -12, 0, +3). The boundary box at -48 h is clipped at the left axis boundary. The instructions and chart
 legend explain the encoding. The transfer-time box is at 0 h; the 0–3 h shading
 indicates duration, not extra interpolated samples.
 

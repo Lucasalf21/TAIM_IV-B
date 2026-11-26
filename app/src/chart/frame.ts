@@ -15,7 +15,6 @@ export interface Renderer {
 export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
   const yMin = context.yMin ?? 0;
   const yMax = context.yMax;
-  const episodeStart = Math.min(...context.episode.hours);
   const [xMin, xMax] = xDomainFor(context.episode);
   const yRange = yMax - yMin;
   const yStep = yRange > 12 ? 2 : 1;
@@ -27,7 +26,7 @@ export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
     width: 900, height: 440, marginLeft: 65, marginRight: 96, marginTop: 42, marginBottom: 54,
     style: { background: THEME.background, color: THEME.text, fontSize: '14px', fontFamily: 'inherit' },
     ariaLabel: 'Wind speed at 100 metres over time. Highlighted transfer window starts at zero hours; limit is 5 metres per second.',
-    x: { domain: [xMin, xMax], label: 'Hours relative to transfer', ticks: xTicks(episodeStart) },
+    x: { domain: [xMin, xMax], label: 'Hours relative to transfer', ticks: xTicks() },
     y: { domain: [yMin, yMax], ticks: yTicks, label: 'Wind speed at 100 m (m/s)', grid: true },
     marks: [
       Plot.rect([{ x1: 0, x2: 3, y1: yMin, y2: yMax }], { x1: 'x1', x2: 'x2', y1: 'y1', y2: 'y2', fill: THEME.deepBand }),
@@ -43,19 +42,14 @@ export function renderFrame(context: ChartContext, marks: Plot.Markish[]) {
   chart.querySelectorAll('g[aria-label]').forEach(group => group.setAttribute('role', 'group'));
   return chart;
 }
-export function xTicks(xMin: number) {
-  if (!Number.isFinite(xMin) || xMin > 0) throw Error('Chart start time must be finite and at or before transfer.');
-  const interval = Math.max(3, Math.ceil(Math.abs(xMin) / 15) * 3);
-  const ticks: number[] = [];
-  for (let hour = xMin; hour < 0; hour += interval) ticks.push(hour);
-  ticks.push(0, 3);
-  return ticks;
+export function xTicks() {
+  return [-48, -36, -24, -12, 0, 3];
 }
 export function xDomainFor(episode: Episode): [number, number] {
   if (!episode.hours.length || episode.hours.some(hour => !Number.isFinite(hour))) {
     throw Error('Chart hours must be finite.');
   }
-  return [Math.min(...episode.hours), 3];
+  return [-48, 3];
 }
 export function contextFor(data: Dataset, episode: Episode): ChartContext {
   if (episode.members.some(member => member.some(v => !Number.isFinite(v) || v < 0))) {
