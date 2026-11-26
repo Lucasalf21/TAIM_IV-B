@@ -1,6 +1,6 @@
 import './style.css';
 import source from './generated/stimuli.json';
-import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, PROBABILITY_EPISODES,
+import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, finish, parseRating, PROBABILITY_EPISODES,
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import {CONSENT_HTML, CONSENT_VERSION} from './consent.ts';
 import type {Condition, Dataset, Demographics, Mode, Questionnaire, Session} from './core.ts';
@@ -271,6 +271,65 @@ function instructions() {
     <div class="actions"><button id="start">Begin trials</button></div></section>`, 'Instructions');
   $('#start').onclick = () => action(() => begin(session!));
 }
+interface RatingSpec {
+  name: string;
+  label: string;
+  hint: string;
+  min: number;
+  max: number;
+  step: number;
+}
+function ratingControl({name, label, hint, min, max, step}: RatingSpec): string {
+  const midpoint = (min + max) / 2;
+  const labelId = `rating-${name}-label`;
+  const hintId = `rating-${name}-hint`;
+  const rangeId = `rating-${name}-range`;
+  const numberId = `rating-${name}-number`;
+  return `<div class="rating-field" data-rating="${escape(name)}" data-answered="false">
+    <label class="rating-label" for="${escape(numberId)}" id="${escape(labelId)}">${escape(label)}</label>
+    <small id="${escape(hintId)}">${escape(hint)}</small>
+    <div class="rating-controls">
+      <div class="rating-slider-wrap">
+        <input type="range" class="rating-range" id="${escape(rangeId)}" min="${min}" max="${max}" step="${step}" value="${midpoint}" aria-labelledby="${escape(labelId)}" aria-describedby="${escape(hintId)}">
+        <div class="rating-bounds" aria-hidden="true"><span>${min}</span><span>${max}</span></div>
+      </div>
+      <input type="number" class="rating-number" id="${escape(numberId)}" name="${escape(name)}" min="${min}" max="${max}" step="${step}" required inputmode="numeric" aria-describedby="${escape(hintId)}">
+    </div>
+  </div>`;
+}
+function wireRatings(container: ParentNode) {
+  container.querySelectorAll<HTMLElement>('[data-rating]').forEach(field => {
+    const range = field.querySelector<HTMLInputElement>('.rating-range')!;
+    const number = field.querySelector<HTMLInputElement>('.rating-number')!;
+    const min = Number(range.min), max = Number(range.max), step = Number(range.step);
+    const setAnswered = (answered: boolean) => {
+      field.dataset.answered = answered ? 'true' : 'false';
+    };
+    const commitFromRange = () => {
+      number.value = range.value;
+      setAnswered(true);
+    };
+    range.addEventListener('pointerdown', event => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      commitFromRange();
+    });
+    range.addEventListener('input', commitFromRange);
+    number.addEventListener('input', () => {
+      const raw = number.value.trim();
+      if (!raw) {
+        setAnswered(false);
+        return;
+      }
+      try {
+        const parsed = parseRating(raw, min, max, step);
+        range.value = String(parsed);
+        setAnswered(true);
+      } catch {
+        setAnswered(false);
+      }
+    });
+  });
+}
 function trial() {
   const s = session!, item = current(s);
   const renderer = renderers[s.condition];
@@ -280,9 +339,10 @@ function trial() {
     <section class="chart-card" aria-label="Wind chart"><div id="chart"></div>${renderer.implemented ? '' : '<p class="placeholder">Chart placeholder · wind values are not drawn</p>'}
     ${s.condition === 'IV-3' ? '<p class="chart-note">Box: middle 50% · line inside: median · whiskers: minimum–maximum. Transfer check at 0 h; shaded window: 0 to +3 h.</p>' : s.condition === 'IV-4' ? '<p class="chart-note">One dot per ensemble member at the midpoint of each 3-hour interval · dots are not connected. Transfer check at 0 h; shaded window: 0 to +3 h.</p>' : ''}</section>
     <form id="response" class="response card"><fieldset><legend>Do you send the crew?</legend><div class="decisions"><label><input type="radio" name="decision" value="GO" required><span class="choice"><b>GO</b><span>Send the crew</span></span></label><label><input type="radio" name="decision" value="CANCEL" required><span class="choice"><b>CANCEL</b><span>Cancel the transfer</span></span></label></div></fieldset>
-    <div class="fields"><label>Confidence that your choice is correct (%)<input type="number" name="confidence" min="50" max="100" step="any" required inputmode="decimal"><small>50 = as uncertain as a coin toss · 100 = completely confident</small></label>
-    ${probability ? '<label>Chance that wind exceeds 5 m/s in the transfer window (%)<input type="number" name="probability" min="0" max="100" step="any" required inputmode="decimal"><small>0 = no chance · 100 = certain</small></label>' : ''}</div>
+    <div class="fields">${ratingControl({name: 'confidence', label: 'Confidence that your choice is correct (%)', hint: '50 = as uncertain as a coin toss · 100 = completely confident', min: 50, max: 100, step: 1})}
+    ${probability ? ratingControl({name: 'probability', label: 'Chance that wind exceeds 5 m/s in the transfer window (%)', hint: '0 = no chance · 100 = certain', min: 0, max: 100, step: 1}) : ''}</div>
     <div class="submit-row"><button type="submit" id="submit" disabled>Submit response</button><span class="hint">Your response is locked after submission.</span></div></form>`, 'Trial');
+  wireRatings($('#response'));
   const episode = data.episodes.find(e => e.id === item.id)!;
   const context = contextFor(data, episode);
   $('#chart').append(renderFrame(context, renderer.marks(context)));
@@ -310,13 +370,19 @@ const tlxLabels: Record<typeof TLX[number], [string, string]> = {
 };
 function questionnaire() {
   shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Final questionnaire</p><h1 tabindex="-1">How did the task feel?</h1><p class="lead">Rate each dimension from 0 to 100, in steps of 5. There are no preset answers.</p></div>
-    <form id="questionnaire"><div class="tlx">${TLX.map(k => `<label><span class="name">${tlxLabels[k][0]}</span><small>${tlxLabels[k][1]}</small><input name="${k}" type="number" min="0" max="100" step="5" required></label>`).join('')}</div>
+    <form id="questionnaire"><div class="tlx">${TLX.map(k => ratingControl({name: k, label: tlxLabels[k][0], hint: tlxLabels[k][1], min: 0, max: 100, step: 5})).join('')}</div>
     <label>Comments (optional)<textarea name="comments" maxlength="4000" rows="4" placeholder="What helped you decide? What was difficult?"></textarea><small>Do not include names or other identifying information. Maximum 4,000 characters.</small></label><div class="form-foot"><button type="submit">Finish session</button></div></form></section>`, 'Questionnaire');
+  wireRatings($('#questionnaire'));
   $('#questionnaire').onsubmit = event => {
     event.preventDefault();
     const form = new FormData(event.target as HTMLFormElement);
-    const q = Object.fromEntries([...TLX.map(k => [k, Number(form.get(k))]), ['comments', String(form.get('comments') ?? '')]]) as Questionnaire;
-    action(() => finish(session!, q));
+    action(() => {
+      const q = Object.fromEntries([
+        ...TLX.map(k => [k, parseRating(String(form.get(k) ?? ''), 0, 100, 5)]),
+        ['comments', String(form.get('comments') ?? '')]
+      ]) as Questionnaire;
+      return finish(session!, q);
+    });
   };
 }
 function render() {
