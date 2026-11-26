@@ -127,7 +127,7 @@ def main():
     with debrief_path.open('x') as f:
         json.dump(debrief, f, indent=2)
     print(f'Scored {len(result)} submitted measured trials. Review repeated exposures and flags before analysis.')
-    print(f'Load {debrief_path} from the completed session’s researcher screen to show outcome feedback.')
+    print(f'Wrote debrief data to {debrief_path}.')
 
 
 if __name__ == '__main__':
