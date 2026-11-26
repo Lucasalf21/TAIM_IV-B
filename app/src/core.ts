@@ -1,7 +1,8 @@
 export type Condition = 'IV-3' | 'IV-4';
 export type Mode = 'simulated' | 'pilot' | 'study';
 export type Decision = 'GO' | 'CANCEL';
-import {CONSENT_VERSION} from './consent.ts';
+import {COMPATIBLE_CONSENT_VERSIONS, CONSENT_VERSION} from './consent.ts';
+const hasAcceptedConsent = (s: Session) => !!s.consent && (COMPATIBLE_CONSENT_VERSIONS as readonly string[]).includes(s.consent.version);
 export type Phase = 'consent' | 'demographics' | 'instructions' | 'trial' | 'feedback' | 'between' | 'questionnaire' | 'complete' | 'declined' | 'withdrawn';
 export interface Episode {id: string; hours: number[]; members: number[][]; windowStart: number; observed?: number}
 export interface Dataset {version: string; threshold: number; windowHours: number; episodes: Episode[]}
@@ -52,7 +53,7 @@ export function acceptConsent(s: Session, agreed: boolean): Session {
   return {...s, consent: {version: CONSENT_VERSION, accepted: new Date().toISOString()}, phase: 'demographics'};
 }
 export function submitDemographics(s: Session, demographics: Demographics): Session {
-  if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required.');
+  if (!hasAcceptedConsent(s)) throw Error('Consent is required.');
   if (s.phase !== 'demographics') throw Error('Demographics form is not active.');
   if (!demographics.age || !demographics.field || !demographics.normalColorVision ||
       !Number.isFinite(demographics.chartFamiliarity) || demographics.chartFamiliarity < 1 || demographics.chartFamiliarity > 5 ||
@@ -77,7 +78,7 @@ export function current(s: Session) {
   return {id: s.sequence[s.cursor], practice: false, position: s.cursor + 1};
 }
 export function begin(s: Session): Session {
-  if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required before any trial.');
+  if (!hasAcceptedConsent(s)) throw Error('Consent is required before any trial.');
   if (!['instructions', 'between', 'demographics'].includes(s.phase)) throw Error('Cannot begin a trial now.');
   const next = structuredClone(s);
   if (next.cursor === 20) { next.phase = 'questionnaire'; return next; }
@@ -90,7 +91,7 @@ export function begin(s: Session): Session {
   return next;
 }
 export function submit(s: Session, decision: string, confidence: string, probability: string, durationMs: number): Session {
-  if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required.');
+  if (!hasAcceptedConsent(s)) throw Error('Consent is required.');
   if (s.phase !== 'trial' || !Number.isFinite(durationMs) || durationMs < 0) throw Error('Trial is not ready.');
   const numeric = (value: string, min: number, max: number) => {
     const number = Number(value);
@@ -112,7 +113,7 @@ export function submit(s: Session, decision: string, confidence: string, probabi
   return next;
 }
 export function finish(s: Session, q: Questionnaire): Session {
-  if (s.consent?.version !== CONSENT_VERSION) throw Error('Consent is required.');
+  if (!hasAcceptedConsent(s)) throw Error('Consent is required.');
   if (s.phase !== 'questionnaire') throw Error('Complete the trials first.');
   for (const key of TLX) if (!Number.isFinite(q[key]) || q[key] < 0 || q[key] > 100) throw Error('Answer every workload question from 0 to 100.');
   if (typeof q.comments !== 'string' || q.comments.length > 4000) throw Error('Comments must be at most 4,000 characters.');
@@ -125,13 +126,13 @@ export function recover(text: string, data: Dataset): Session {
     typeof s.id !== 'string' || !s.id || !date(s.created) ||
     !/^[A-Za-z0-9_-]{1,32}$/.test(s.participant) || !['IV-3', 'IV-4'].includes(s.condition) ||
     !['simulated', 'pilot', 'study'].includes(s.mode) ||
-    !['consent', 'demographics', 'instructions', 'trial', 'feedback', 'between', 'questionnaire', 'complete', 'declined', 'withdrawn'].includes(s.phase) ||
-    !Number.isInteger(s.cursor) || s.cursor < 0 || s.cursor > 22 || !Array.isArray(s.attempts) ||
+    !['consent', 'demographics', 'instructions', 'trial', 'between', 'questionnaire', 'complete', 'declined', 'withdrawn'].includes(s.phase) ||
+    !Number.isInteger(s.cursor) || s.cursor < 0 || s.cursor > 20 || !Array.isArray(s.attempts) ||
     JSON.stringify(s.sequence) !== JSON.stringify(latinSquare(data.episodes.map(e => e.id), s.orderRow))) {
     throw Error('Saved session is incompatible or damaged. Export its backup before starting again.');
   }
   const stopped = ['withdrawn', 'declined'].includes(s.phase);
-  if (s.consent && (s.consent.version !== CONSENT_VERSION || !date(s.consent.accepted))) throw Error('Saved consent is incompatible or damaged.');
+  if (s.consent && (!(COMPATIBLE_CONSENT_VERSIONS as readonly string[]).includes(s.consent.version) || !date(s.consent.accepted))) throw Error('Saved consent is incompatible or damaged.');
   if ((!['consent', 'declined'].includes(s.phase) && !s.consent) ||
     (['consent', 'declined'].includes(s.phase) && s.consent) ||
     (['consent', 'declined', 'withdrawn'].includes(s.phase) && (s.cursor !== 0 || s.attempts.length || s.questionnaire || s.completed)) ||
@@ -161,9 +162,9 @@ export function recover(text: string, data: Dataset): Session {
   }
   if (completed !== s.cursor ||
     ((['demographics', 'instructions'].includes(s.phase)) && s.cursor !== 0) ||
-    (s.phase === 'feedback' && (s.cursor < 1 || s.cursor > 2 || s.attempts.at(-1)?.status !== 'submitted')) ||
-    (['questionnaire', 'complete'].includes(s.phase) && s.cursor !== 22) ||
-    (s.phase === 'trial' && s.cursor === 22)) throw Error('Saved trial history is inconsistent.');
+    (s.phase === 'between' && s.cursor < 1) ||
+    (['questionnaire', 'complete'].includes(s.phase) && s.cursor !== 20) ||
+    (s.phase === 'trial' && s.cursor === 20)) throw Error('Saved trial history is inconsistent.');
   if (s.phase === 'complete') {
     if (!date(s.completed) || !s.questionnaire) throw Error('Saved questionnaire is damaged.');
     finish({...s, phase: 'questionnaire'}, s.questionnaire);

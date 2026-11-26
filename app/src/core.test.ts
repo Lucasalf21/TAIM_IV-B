@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, finishPractice, latinSquare, PROBABILITY_EPISODES,
+import {acceptConsent, begin, createSession, csv, deleteLocal, exportsFor, finish, latinSquare, PROBABILITY_EPISODES,
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import type {Dataset, Session} from './core.ts';
-import {contextFor} from './chart/frame.ts';
+import {contextFor, practiceEpisode} from './chart/frame.ts';
 import {readFileSync} from 'node:fs';
 const data: Dataset = {version: 'test', threshold: 5, windowHours: 3,
   episodes: Array.from({length: 20}, (_, i) => ({id: `E${String(i + 1).padStart(2, '0')}`, hours: [0], members: [], windowStart: 0, observed: 0 as const}))};
@@ -137,4 +137,54 @@ test('demographics collection, validation, transition, and CSV export', () => {
   const sessionCsv = exportsFor(s).session;
   assert.match(sessionCsv, /"21-23"/);
   assert.match(sessionCsv, /"Computing \/ informatics"/);
+});
+test('recovery handles interruption before trial 1, questionnaire, results, and rejects 22-trial cursors', () => {
+  const demo = {age: '21-23', field: 'Computing / informatics', chartFamiliarity: 3, weatherFamiliarity: 3, normalColorVision: 'Yes'};
+  const withDemo = submitDemographics(create(), demo);
+  const interruptedFirst = recover(JSON.stringify(begin(withDemo)), data);
+  assert.equal(interruptedFirst.phase, 'instructions');
+  assert.equal(interruptedFirst.cursor, 0);
+  assert.equal(interruptedFirst.attempts[0].status, 'interrupted');
+  assert.ok(interruptedFirst.attempts[0].flags.includes('recovered-interruption'));
+  assert.equal(recover(JSON.stringify(interruptedFirst), data).phase, 'instructions');
+  const retriedFirst = begin(interruptedFirst);
+  assert.equal(retriedFirst.attempts[1].attempt, 2);
+  assert.equal(retriedFirst.attempts[1].repeated, true);
+  assert.equal(retriedFirst.attempts[1].position, 1);
+
+  const interruptedNoDemo = recover(JSON.stringify(begin(create())), data);
+  assert.equal(interruptedNoDemo.phase, 'demographics');
+
+  let s = withDemo;
+  for (let i = 0; i < 20; i++) {
+    s = begin(s);
+    if (i === 0) assert.equal(recover(JSON.stringify(submit(s, 'GO', '75', '20', 100)), data).phase, 'between');
+    s = submit(s, 'GO', '75', '20', 100);
+  }
+  assert.equal(s.phase, 'between');
+  assert.equal(s.cursor, 20);
+  assert.equal(recover(JSON.stringify(s), data).phase, 'between');
+  const atQuestionnaire = begin(s);
+  assert.equal(atQuestionnaire.phase, 'questionnaire');
+  assert.equal(recover(JSON.stringify(atQuestionnaire), data).phase, 'questionnaire');
+  const q = {...Object.fromEntries(TLX.map(k => [k, 25])), comments: ''};
+  const completed = finish(atQuestionnaire, q as Parameters<typeof finish>[1]);
+  assert.equal(recover(JSON.stringify(completed), data).phase, 'complete');
+
+  assert.throws(() => recover(JSON.stringify({...s, cursor: 21}), data));
+  assert.throws(() => recover(JSON.stringify({...s, cursor: 22}), data));
+  assert.throws(() => recover(JSON.stringify({...atQuestionnaire, phase: 'trial'}), data));
+  assert.throws(() => recover(JSON.stringify({...withDemo, phase: 'between', cursor: 0}), data));
+});
+test('recovery keeps compatibility for valid old consent without misrepresenting it', () => {
+  const oldSave = create();
+  oldSave.consent = {version: 'ivb-consent-2026-11-23', accepted: '2026-11-23T12:00:00.000Z'};
+  const recovered = recover(JSON.stringify(oldSave), data);
+  assert.equal(recovered.consent?.version, 'ivb-consent-2026-11-23');
+  let s = submitDemographics(recovered, {age: '21-23', field: 'Other', chartFamiliarity: 2, weatherFamiliarity: 2, normalColorVision: 'Yes'});
+  for (let i = 0; i < 20; i++) { s = begin(s); s = submit(s, 'GO', '75', '20', 100); }
+  s = begin(s);
+  s = finish(s, {...Object.fromEntries(TLX.map(k => [k, 20])), comments: ''} as Parameters<typeof finish>[1]);
+  assert.equal(recover(JSON.stringify(s), data).consent?.version, 'ivb-consent-2026-11-23');
+  assert.throws(() => recover(JSON.stringify({...oldSave, consent: {version: 'ivb-consent-unknown', accepted: '2026-11-23T12:00:00.000Z'}}), data));
 });

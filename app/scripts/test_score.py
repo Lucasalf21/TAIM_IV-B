@@ -28,7 +28,7 @@ class ScoringTest(unittest.TestCase):
                 writer = csv.DictWriter(f, fieldnames=['phase', 'session_phase', 'withdrawn_at', 'consent_version', 'consent_at'])
                 writer.writeheader()
                 writer.writerow({'phase': 'withdrawn', 'session_phase': 'withdrawn', 'withdrawn_at': '2026-11-09T13:00:00Z',
-                                 'consent_version': 'ivb-consent-2026-11-23', 'consent_at': '2026-11-23T12:00:00Z'})
+                                 'consent_version': 'ivb-consent-2026-11-26', 'consent_at': '2026-11-26T12:00:00Z'})
             # Reject the latest exit record before even reading a stale trials file.
             output = root / 'scored.csv'
             result = subprocess.run([sys.executable, str(Path(__file__).with_name('score.py')),
@@ -39,10 +39,10 @@ class ScoringTest(unittest.TestCase):
 
     def test_scoring_requires_complete_current_consent_and_no_withdrawal(self):
         row = {'phase': 'complete', 'session_phase': 'complete', 'withdrawn_at': '',
-               'consent_version': 'ivb-consent-2026-11-23', 'consent_at': '2026-11-23T12:00:00Z'}
+               'consent_version': 'ivb-consent-2026-11-26', 'consent_at': '2026-11-26T12:00:00Z'}
         validate_session(row)
         for change in [{'phase': 'withdrawn'}, {'session_phase': 'trial'}, {'withdrawn_at': '2026-11-09T13:00:00Z'},
-                       {'consent_version': ''}, {'consent_at': ''}, {'consent_at': 'broken'}]:
+                       {'consent_version': ''}, {'consent_version': 'ivb-consent-2026-11-23'}, {'consent_at': ''}, {'consent_at': 'broken'}]:
             with self.assertRaises(ValueError):
                 validate_session({**row, **change})
 

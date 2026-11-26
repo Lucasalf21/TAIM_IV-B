@@ -4,7 +4,7 @@ import {acceptConsent, begin, createSession, current, deleteLocal, exportsFor, f
   recover, save, STORAGE_KEY, submit, submitDemographics, TLX, withdraw} from './core.ts';
 import {CONSENT_HTML, CONSENT_VERSION} from './consent.ts';
 import type {Condition, Dataset, Demographics, Mode, Questionnaire, Session} from './core.ts';
-import {contextFor, practiceEpisode, renderFrame} from './chart/frame.ts';
+import {contextFor, renderFrame} from './chart/frame.ts';
 import {iv3} from './chart/iv3.ts';
 import {iv4} from './chart/iv4.ts';
 import {feedbackRows} from './feedback.ts';
@@ -53,12 +53,11 @@ function download(name: string, text: string, type = 'text/csv;charset=utf-8') {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function shell(content: string, title: string) {
-  root.innerHTML = `<header class="topbar"><div class="wrap topbar-inner"><span class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>TAIM</strong> / Wind transfer experiment</span></span><nav aria-label="Session controls">${!researcher && session && !['declined', 'withdrawn'].includes(session.phase) ? '<button class="danger small" id="leave">Leave experiment</button>' : ''}<button class="ghost small" id="researcher">${researcher ? 'Participant screen' : 'Researcher screen'}</button></nav></div>
+  root.innerHTML = `<header class="topbar"><div class="wrap topbar-inner"><span class="brand"><span class="brand-mark" aria-hidden="true"></span><span><strong>TAIM</strong> / Wind transfer experiment</span></span></div>
     ${session?.mode === 'simulated' ? '<div class="simulation" role="note"><span class="tag">Simulation</span><span>Simulated session · not participant evidence</span></div>' : ''}</header>
     <main class="wrap"><div id="error" role="alert" tabindex="-1"></div>${content}</main>
     <footer><div class="wrap">TAIM 2026–27 · IV-B <span>Generated using Copernicus Climate Change Service information 2026. Neither the European Commission nor ECMWF is responsible for any use that may be made of the Copernicus information or data it contains.</span></div></footer>
     <dialog id="delete-dialog" aria-labelledby="delete-title"><h2 id="delete-title">Delete this browser’s session?</h2><p>This permanently removes its local responses, consent and session record. It cannot delete CSVs, JSON backups or scored files already downloaded. Ask the researcher to remove those copies using your session code.</p><p id="delete-reference"></p><div class="actions"><button class="secondary" id="keep-local">Keep local data</button><button class="danger" id="confirm-delete">Delete local data</button></div></dialog>`;
-  root.querySelector<HTMLButtonElement>('#leave')?.addEventListener('click', leave);
   $('#keep-local').onclick = () => $<HTMLDialogElement>('#delete-dialog').close();
   $('#confirm-delete').onclick = () => {
     try {
@@ -69,19 +68,6 @@ function shell(content: string, title: string) {
     } catch (e) { $<HTMLDialogElement>('#delete-dialog').close(); notice((e as Error).message); }
   };
   document.title = `${title} · TAIM`;
-  $('#researcher').onclick = () => {
-    if (!researcher && session?.phase === 'trial') {
-      const next = structuredClone(session);
-      const a = next.attempts.at(-1)!; a.status = 'interrupted'; a.ended = new Date().toISOString(); a.flags.push('researcher-pause');
-      next.phase = next.cursor === 0 ? 'instructions' : 'between';
-      if (!commit(next)) {
-        researcher = true; render();
-        notice('Saving failed. Export a JSON backup and partial CSVs before recovering this session.');
-        return;
-      }
-    }
-    researcher = !researcher; render();
-  };
   root.querySelector<HTMLElement>('h1')?.focus();
 }
 function requestDelete() {
@@ -172,8 +158,7 @@ function results() {
     <tr><th scope="col">Trial</th><th scope="col">Your choice</th><th scope="col" class="group-start">Ensemble chance above limit</th><th scope="col">Cost-minimising choice</th><th scope="col">Decision quality</th><th scope="col" class="group-start">Recorded wind</th><th scope="col">Outcome agreement</th><th scope="col">Scenario cost</th></tr></thead>
     <tbody>${rows.map(r => `<tr><th scope="row">${r.position}</th><td class="choice-tag">${r.decision}</td><td class="group-start">${Math.round(r.probability * 100)}%</td><td>${r.recommended}</td><td>${badge(r.goodDecision, 'Matches rule', 'Does not match rule')}</td><td class="group-start">${r.observed ? 'Above limit' : 'At/below limit'}</td><td>${badge(r.matchedOutcome, 'Matches outcome', 'Does not match outcome')}</td><td>${money(r.cost)}</td></tr>`).join('')}</tbody></table></div>
     <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(s.participant)}</dd><dt>Session code</dt><dd>${escape(s.id)}</dd></dl>
-    <p>Keep these codes to request deletion of downloaded copies. You can still leave to withdraw your responses.</p><div class="actions"><button class="danger" id="delete-local">Delete local session</button></div></section>`, 'Results');
-  $('#delete-local').onclick = requestDelete;
+    <p>Keep these codes to request deletion of downloaded copies.</p></section>`, 'Results');
 }
 function consent() {
   shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Participant information and consent</p><h1 tabindex="-1">Your choice to take part.</h1></div><div class="prose">${CONSENT_HTML}</div>
@@ -353,8 +338,8 @@ function render() {
     case 'declined':
     case 'withdrawn':
       shell(`<section class="reading"><div class="page-head"><p class="eyebrow">Participation ended</p><h1 tabindex="-1">${session.phase === 'declined' ? 'You chose not to take part.' : 'You have left the experiment.'}</h1><p class="lead">No more answers are required.</p></div><p>Your recorded responses and questionnaire have been discarded from this session; only its consent/exit record remains if saving succeeded. This session cannot resume.</p>
-        <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(session.participant)}</dd><dt>Session code</dt><dd>${escape(session.id)}</dd></dl><p>Ask the supervising researcher to remove any previously downloaded CSVs, backups and scored copies using these codes. Local deletion cannot remove those files.</p><div class="actions"><button class="danger" id="delete-local">Delete local session</button></div></section></section>`, 'Participation ended');
-      $('#delete-local').onclick = requestDelete; break;
+        <section class="card" aria-labelledby="codes-title"><h2 id="codes-title">Your session codes</h2><dl class="codes"><dt>Participant code</dt><dd>${escape(session.participant)}</dd><dt>Session code</dt><dd>${escape(session.id)}</dd></dl><p>Ask the supervising researcher to discard the local session from setup and remove any previously downloaded CSVs, backups and scored copies using these codes.</p></section></section>`, 'Participation ended');
+      break;
   }
 }
 document.addEventListener('visibilitychange', () => {
